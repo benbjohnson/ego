@@ -6,12 +6,14 @@ import (
 	"go/format"
 	"io"
 	"path/filepath"
+	"strings"
 )
 
 // Template represents an entire Ego template.
 // A template consists of a declaration block followed by zero or more blocks.
 // Blocks can be either a TextBlock, a PrintBlock, or a CodeBlock.
 type Template struct {
+	Path string
 	Blocks []Block
 }
 
@@ -24,8 +26,15 @@ func (t *Template) Write(w io.Writer) error {
 		return ErrDeclarationRequired
 	}
 
+	// Add package if not specified.
+	headerBlocks := t.headerBlocks()
+	if len(headerBlocks) == 0 || !strings.HasPrefix(strings.TrimSpace(headerBlocks[0].Content), "package") {
+		path, _ := filepath.Abs(t.Path)
+		fmt.Fprintf(&buf, "package %s\n", filepath.Base(filepath.Dir(path)))
+	}
+
 	// Write header blocks first.
-	for _, b := range t.headerBlocks() {
+	for _, b := range headerBlocks {
 		if err := b.write(&buf); err != nil {
 			return err
 		}
@@ -78,8 +87,8 @@ func (t *Template) declarationBlock() *DeclarationBlock {
 	return nil
 }
 
-func (t *Template) headerBlocks() []Block {
-	var blocks []Block
+func (t *Template) headerBlocks() []*HeaderBlock {
+	var blocks []*HeaderBlock
 	for _, b := range t.Blocks {
 		if b, ok := b.(*HeaderBlock); ok {
 			blocks = append(blocks, b)

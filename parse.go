@@ -9,7 +9,7 @@ import (
 // The path specifies the path name used in the compiled template's pragmas.
 func Parse(r io.Reader, path string) (*Template, error) {
 	s := NewScanner(r, path)
-	t := &Template{}
+	t := &Template{Path: path}
 	for {
 		b, err := s.Scan()
 		if err == io.EOF {
