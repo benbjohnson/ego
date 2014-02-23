@@ -18,7 +18,7 @@ func TestTemplateWrite(t *testing.T) {
 			&HeaderBlock{Content: "package foo", Pos: Pos{Path: "foo.ego", LineNo: 2}},
 			&TextBlock{Content: "<html>", Pos: Pos{Path: "foo.ego", LineNo: 4}},
 			&HeaderBlock{Content: "import \"fmt\"", Pos: Pos{Path: "foo.ego", LineNo: 8}},
-			&DeclarationBlock{Content: " MyTemplate(w io.Writer, nums []int) error "},
+			&DeclarationBlock{Content: " func MyTemplate(w io.Writer, nums []int) error "},
 			&CodeBlock{Content: "  for _, num := range nums {"},
 			&TextBlock{Content: "    <p>"},
 			&PrintBlock{Content: "num + 1"},

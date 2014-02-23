@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"strings"
+	"path/filepath"
 )
 
 // Template represents an entire Ego template.
@@ -15,21 +15,12 @@ type Template struct {
 	Blocks []Block
 }
 
-// Declaration returns the function signature used by the template.
-func (t *Template) Declaration() string {
-	for _, b := range t.Blocks {
-		if b, ok := b.(*DeclarationBlock); ok {
-			return strings.TrimSpace(b.Content)
-		}
-	}
-	return ""
-}
-
 // Write writes the template to a writer.
 func (t *Template) Write(w io.Writer) error {
 	var buf bytes.Buffer
 
-	if t.Declaration() == "" {
+	decl := t.declarationBlock()
+	if decl == nil {
 		return ErrDeclarationRequired
 	}
 
@@ -41,7 +32,7 @@ func (t *Template) Write(w io.Writer) error {
 	}
 
 	// Write function declaration.
-	fmt.Fprintf(&buf, "func %s {\n", t.Declaration())
+	decl.write(&buf)
 
 	// Write non-header blocks.
 	for _, b := range t.nonHeaderBlocks() {
@@ -69,12 +60,22 @@ func (t *Template) WriteFormatted(w io.Writer) error {
 	// Format generated source code.
 	b, err := format.Source(buf.Bytes())
 	if err != nil {
+		buf.WriteTo(w)
 		return err
 	}
 
 	// Write code to external writer.
 	_, err = w.Write(b)
 	return err
+}
+
+func (t *Template) declarationBlock() *DeclarationBlock {
+	for _, b := range t.Blocks {
+		if b, ok := b.(*DeclarationBlock); ok {
+			return b
+		}
+	}
+	return nil
 }
 
 func (t *Template) headerBlocks() []Block {
@@ -90,7 +91,9 @@ func (t *Template) headerBlocks() []Block {
 func (t *Template) nonHeaderBlocks() []Block {
 	var blocks []Block
 	for _, b := range t.Blocks {
-		if _, ok := b.(*HeaderBlock); !ok {
+		switch b.(type) {
+		case *DeclarationBlock, *HeaderBlock:
+		default:
 			blocks = append(blocks, b)
 		}
 	}
@@ -116,6 +119,8 @@ type DeclarationBlock struct {
 }
 
 func (b *DeclarationBlock) write(buf *bytes.Buffer) error {
+	b.Pos.write(buf)
+	fmt.Fprintf(buf, "%s {\n", b.Content)
 	return nil
 }
 
@@ -175,6 +180,6 @@ type Pos struct {
 
 func (p *Pos) write(buf *bytes.Buffer) {
 	if p != nil && p.Path != "" && p.LineNo > 0 {
-		fmt.Fprintf(buf, "//line %s:%d\n", p.Path, p.LineNo)
+		fmt.Fprintf(buf, "//line %s:%d\n", filepath.Base(p.Path), p.LineNo)
 	}
 }

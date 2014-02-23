@@ -1,11 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
-	"log"
 	"go/scanner"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -51,12 +50,6 @@ func walk(path string, info os.FileInfo, err error) error {
 		return err
 	}
 
-	// Write to temporary buffer.
-	var buf bytes.Buffer
-	if err := t.WriteFormatted(&buf); err != nil {
-		return fmt.Errorf("%s: %v", path, err)
-	}
-
 	// Write template to output file.
 	filename := fmt.Sprintf("%s.go", path)
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, info.Mode())
@@ -65,7 +58,8 @@ func walk(path string, info os.FileInfo, err error) error {
 	}
 	defer f.Close()
 
-	if _, err := f.Write(buf.Bytes()); err != nil {
+	// Write template to file.
+	if err := t.WriteFormatted(f); err != nil {
 		return err
 	}
 

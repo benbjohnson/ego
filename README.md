@@ -52,7 +52,7 @@ Declarations are expected to have a single `io.Writer` named `w` and to return a
 Below is an example ego template for a web page:
 
 ```ego
-<%! MyTmpl(w io.Writer, u *User) error %>
+<%! func MyTmpl(w io.Writer, u *User) error %>
 
 <%% package mypkg %>
 
