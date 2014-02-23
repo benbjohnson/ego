@@ -32,9 +32,8 @@ func (s *Scanner) Scan() (Block, error) {
 
 	if ch == '<' {
 		return s.scanBlock()
-	} else {
-		return s.scanTextBlock(string(ch))
 	}
+	return s.scanTextBlock(string(ch))
 }
 
 func (s *Scanner) scanBlock() (Block, error) {
