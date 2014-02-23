@@ -24,6 +24,8 @@ The output file for an ego template is simply the original template name plus a 
 
 An ego template is made up of 4 types of blocks: text blocks, code blocks, header blocks and a declaration block.
 
+If a package name is not specified in the first header block then the directory's name is used.
+
 ### Text Blocks
 
 Text blocks are simply any text which is not wrapped with `<%` and `%>` delimiters. All text blocks are output as-is with no special treatment.
