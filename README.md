@@ -87,3 +87,10 @@ myUser := &User{
 var buf bytes.Buffer
 mypkg.MyTmpl(&buf, myUser)
 ```
+
+
+## Caveats
+
+Unlike other runtime-based templating languages, ego does not support ad hoc templates. All templates must be generated before compile time.
+
+Ego does not attempt to provide any security around the templates. Just like regular Go code, the security model is up to you.
