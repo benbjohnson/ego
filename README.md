@@ -56,7 +56,7 @@ Below is an example ego template for a web page:
 ```ego
 <%! func MyTmpl(w io.Writer, u *User) error %>
 
-<%% package mypkg %>
+<%% package mypkg %%>
 
 <%%
 import (
@@ -68,10 +68,10 @@ import (
 <html>
   <body>
     <h1>Hello <%= u.FirstName %>!</h1>
-    
+
     <p>Here's a list of your favorite colors:</p>
     <ul>
-      <% for _, colorName := range u.FavoriteColors %>
+      <% for _, colorName := range u.FavoriteColors { %>
         <li><%= colorName %></li>
       <% } %>
     </ul>
