@@ -11,42 +11,32 @@ To install ego:
 $ go get github.com/benbjohnson/ego/cmd/ego
 ```
 
-Then run ego on a directory to compile all `.ego` files:
+Then run ego on a directory. Recursively traverse the directory structure and compile all `.ego` files.
 
 ```sh
 $ ego mypkg
 ```
 
-The output file for an ego template is simply the original template name plus a `.go` extension.
+All ego files found in a package are compiled and written to a single `ego.go` file. The name of the directory is used as the package name.
 
 
 ## Language Definition
 
-An ego template is made up of 4 types of blocks: text blocks, code blocks, header blocks and a declaration block.
+An ego template is made up of several types of blocks:
 
-If a package name is not specified in the first header block then the directory's name is used.
+* **Code Block** - These blocks execute raw Go code: `<% var foo = "bar" %>`
 
-### Text Blocks
+* **Print Block** - These blocks print a Go expression: `<%= myVar %>`
 
-Text blocks are simply any text which is not wrapped with `<%` and `%>` delimiters. All text blocks are output as-is with no special treatment.
+* **Header Block** - These blocks allow you to import packages: `<%% import "encoding/json" %%>`
 
-### Code Blocks
+* **Declaration Block** - This block defines the function signature for your template.
 
-Code blocks are blocks which execute Go code. These are blocks have the style: `<% ... %>`.
-
-### Header Blocks
-
-Header blocks work the same as code blocks but they are placed at the top of the file regardless of their position in the template. These have the style: `<%% ... %%>`.
-
-### Declaration Block
-
-The declaration block defines the function signature for the template. These have the format:
+A single declaration block should exist at the top of your template and accept an `w io.Writer` and return an `error`. Other arguments can be added as needed. A function receiver can also be used.
 
 ```
-<%! MyTemplate(w io.Writer, myArg1 int) error %>
+<%! func MyTmpl(w io.Writer) error %>
 ```
-
-Declarations are expected to have a single `io.Writer` named `w` and to return an error. Other arguments can be added as needed.
 
 
 ## Example
@@ -56,18 +46,11 @@ Below is an example ego template for a web page:
 ```ego
 <%! func MyTmpl(w io.Writer, u *User) error %>
 
-<%% package mypkg %%>
-
-<%%
-import (
-  "fmt"
-  "io"
-)
-%%>
+<%% import "strings" %%>
 
 <html>
   <body>
-    <h1>Hello <%= u.FirstName %>!</h1>
+    <h1>Hello <%= strings.TrimSpace(u.FirstName) %>!</h1>
 
     <p>Here's a list of your favorite colors:</p>
     <ul>
@@ -79,7 +62,7 @@ import (
 </html>
 ```
 
-Once this template is compiled you can simply call it using the definition you specified:
+Once this template is compiled you can call it using the definition you specified:
 
 ```go
 myUser := &User{
@@ -87,7 +70,7 @@ myUser := &User{
   FavoriteColors: []string{"blue", "green", "mauve"},
 }
 var buf bytes.Buffer
-mypkg.MyTmpl(&buf, myUser)
+err := mypkg.MyTmpl(&buf, myUser)
 ```
 
 
