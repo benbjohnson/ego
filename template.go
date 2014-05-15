@@ -210,8 +210,10 @@ func (p *Package) writeHeader(w io.Writer) error {
 	fmt.Fprintf(&buf, "package %s\n", p.Name)
 
 	// Write deduped imports.
-	var decls = make(map[string]*ast.ImportSpec)
+	var decls = map[string]bool{`:"fmt"`: true, `:"io"`: true}
 	fmt.Fprint(&buf, "import (\n")
+	fmt.Fprintln(&buf, `"fmt"`)
+	fmt.Fprintln(&buf, `"io"`)
 	for _, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
 		if !ok || d.Tok != token.IMPORT {
@@ -227,9 +229,10 @@ func (p *Package) writeHeader(w io.Writer) error {
 			id += ":" + s.Path.Value
 
 			// Ignore any imports which have already been imported.
-			if decls[id] != nil {
+			if decls[id] {
 				continue
 			}
+			decls[id] = true
 
 			// Otherwise write it.
 			if s.Name == nil {
