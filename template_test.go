@@ -15,7 +15,6 @@ func TestTemplate_Write(t *testing.T) {
 	var buf bytes.Buffer
 	tmpl := &Template{
 		Blocks: []Block{
-			&HeaderBlock{Content: "package foo", Pos: Pos{Path: "foo.ego", LineNo: 2}},
 			&TextBlock{Content: "<html>", Pos: Pos{Path: "foo.ego", LineNo: 4}},
 			&HeaderBlock{Content: "import \"fmt\"", Pos: Pos{Path: "foo.ego", LineNo: 8}},
 			&DeclarationBlock{Content: " func MyTemplate(w io.Writer, nums []int) error "},
@@ -27,7 +26,8 @@ func TestTemplate_Write(t *testing.T) {
 			&TextBlock{Content: "</html>"},
 		},
 	}
-	err := tmpl.WriteFormatted(&buf)
+	p := &Package{Templates: []*Template{tmpl}, Name: "foo"}
+	err := p.WriteFormatted(&buf)
 	assert.NoError(t, err)
 }
 
