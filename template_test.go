@@ -11,7 +11,7 @@ import (
 )
 
 // Ensure that a template can be written to a writer.
-func TestTemplateWrite(t *testing.T) {
+func TestTemplate_Write(t *testing.T) {
 	var buf bytes.Buffer
 	tmpl := &Template{
 		Blocks: []Block{

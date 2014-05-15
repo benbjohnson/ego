@@ -2,18 +2,21 @@ package ego
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"go/ast"
 	"go/format"
+	"go/parser"
+	"go/token"
 	"io"
 	"path/filepath"
-	"strings"
 )
 
 // Template represents an entire Ego template.
 // A template consists of a declaration block followed by zero or more blocks.
 // Blocks can be either a TextBlock, a PrintBlock, or a CodeBlock.
 type Template struct {
-	Path string
+	Path   string
 	Blocks []Block
 }
 
@@ -24,20 +27,6 @@ func (t *Template) Write(w io.Writer) error {
 	decl := t.declarationBlock()
 	if decl == nil {
 		return ErrDeclarationRequired
-	}
-
-	// Add package if not specified.
-	headerBlocks := t.headerBlocks()
-	if len(headerBlocks) == 0 || !strings.HasPrefix(strings.TrimSpace(headerBlocks[0].Content), "package") {
-		path, _ := filepath.Abs(t.Path)
-		fmt.Fprintf(&buf, "package %s\n", filepath.Base(filepath.Dir(path)))
-	}
-
-	// Write header blocks first.
-	for _, b := range headerBlocks {
-		if err := b.write(&buf); err != nil {
-			return err
-		}
 	}
 
 	// Write function declaration.
@@ -56,25 +45,6 @@ func (t *Template) Write(w io.Writer) error {
 
 	// Write code to external writer.
 	_, err := buf.WriteTo(w)
-	return err
-}
-
-// WriteFormatted writes and formats the template to a writer.
-func (t *Template) WriteFormatted(w io.Writer) error {
-	var buf bytes.Buffer
-	if err := t.Write(&buf); err != nil {
-		return err
-	}
-
-	// Format generated source code.
-	b, err := format.Source(buf.Bytes())
-	if err != nil {
-		buf.WriteTo(w)
-		return err
-	}
-
-	// Write code to external writer.
-	_, err = w.Write(b)
 	return err
 }
 
@@ -177,7 +147,7 @@ type PrintBlock struct {
 
 func (b *PrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `if _, err := fmt.Fprintf(w, %s); err != nil { return err }`+"\n", b.Content)
+	fmt.Fprintf(buf, `if _, err := fmt.Fprintf(w, "%%v", %s); err != nil { return err }`+"\n", b.Content)
 	return nil
 }
 
@@ -191,4 +161,107 @@ func (p *Pos) write(buf *bytes.Buffer) {
 	if p != nil && p.Path != "" && p.LineNo > 0 {
 		fmt.Fprintf(buf, "//line %s:%d\n", filepath.Base(p.Path), p.LineNo)
 	}
+}
+
+// Package represents a collection of ego templates in a single package.
+type Package struct {
+	Name      string
+	Templates []*Template
+}
+
+// Write writes out the package header and templates to a writer.
+func (p *Package) Write(w io.Writer) error {
+	if err := p.writeHeader(w); err != nil {
+		return err
+	}
+
+	for _, t := range p.Templates {
+		if err := t.Write(w); err != nil {
+			return fmt.Errorf("template: %s: err", t.Path)
+		}
+	}
+
+	return nil
+}
+
+// Writes the package name and consolidated header blocks.
+func (p *Package) writeHeader(w io.Writer) error {
+	if p.Name == "" {
+		return errors.New("package name required")
+	}
+
+	// Write naive header first.
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "package %s\n", p.Name)
+	for _, t := range p.Templates {
+		for _, b := range t.headerBlocks() {
+			b.write(&buf)
+		}
+	}
+
+	// Parse header into Go AST.
+	f, err := parser.ParseFile(token.NewFileSet(), "ego.go", buf.String(), parser.ImportsOnly)
+	if err != nil {
+		return fmt.Errorf("writeHeader: %s", err)
+	}
+
+	// Reset buffer.
+	buf.Reset()
+	fmt.Fprintf(&buf, "package %s\n", p.Name)
+
+	// Write deduped imports.
+	var decls = make(map[string]*ast.ImportSpec)
+	fmt.Fprint(&buf, "import (\n")
+	for _, d := range f.Decls {
+		d, ok := d.(*ast.GenDecl)
+		if !ok || d.Tok != token.IMPORT {
+			continue
+		}
+
+		for _, s := range d.Specs {
+			s := s.(*ast.ImportSpec)
+			var id string
+			if s.Name != nil {
+				id = s.Name.Name
+			}
+			id += ":" + s.Path.Value
+
+			// Ignore any imports which have already been imported.
+			if decls[id] != nil {
+				continue
+			}
+
+			// Otherwise write it.
+			if s.Name == nil {
+				fmt.Fprintf(&buf, "%s\n", s.Path.Value)
+			} else {
+				fmt.Fprintf(&buf, "%s %s\n", s.Name.Name, s.Path.Value)
+			}
+		}
+	}
+	fmt.Fprint(&buf, ")\n")
+
+	// Write out to writer.
+	buf.WriteTo(w)
+
+	return nil
+}
+
+// WriteFormatted writes and formats the package to a writer.
+func (p *Package) WriteFormatted(w io.Writer) error {
+	var buf bytes.Buffer
+	if err := p.Write(&buf); err != nil {
+		return err
+	}
+
+	// Format generated source code.
+	b, err := format.Source(buf.Bytes())
+	if err != nil {
+		buf.WriteTo(w)
+		return err
+	}
+
+	// Write code to external writer.
+	_, err = w.Write(b)
+	return err
 }
