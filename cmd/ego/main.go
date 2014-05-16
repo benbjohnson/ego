@@ -72,7 +72,8 @@ func visitDir(path string) error {
 	}
 
 	// Write package to output file.
-	p := &ego.Package{Templates: templates, Name: filepath.Base(path)}
+	abspath, _ := filepath.Abs(path)
+	p := &ego.Package{Templates: templates, Name: filepath.Base(abspath)}
 	f, err := os.Create(filepath.Join(path, "ego.go"))
 	if err != nil {
 		return err
