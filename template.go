@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/parser"
 	"go/token"
 	"io"
@@ -202,6 +201,7 @@ func (p *Package) writeHeader(w io.Writer) error {
 	// Parse header into Go AST.
 	f, err := parser.ParseFile(token.NewFileSet(), "ego.go", buf.String(), parser.ImportsOnly)
 	if err != nil {
+		fmt.Println(buf.String())
 		return fmt.Errorf("writeHeader: %s", err)
 	}
 
@@ -248,23 +248,4 @@ func (p *Package) writeHeader(w io.Writer) error {
 	buf.WriteTo(w)
 
 	return nil
-}
-
-// WriteFormatted writes and formats the package to a writer.
-func (p *Package) WriteFormatted(w io.Writer) error {
-	var buf bytes.Buffer
-	if err := p.Write(&buf); err != nil {
-		return err
-	}
-
-	// Format generated source code.
-	b, err := format.Source(buf.Bytes())
-	if err != nil {
-		buf.WriteTo(w)
-		return err
-	}
-
-	// Write code to external writer.
-	_, err = w.Write(b)
-	return err
 }

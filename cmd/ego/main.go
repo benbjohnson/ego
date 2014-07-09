@@ -4,86 +4,82 @@ import (
 	"flag"
 	"fmt"
 	"go/scanner"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/benbjohnson/ego"
 )
 
 func main() {
+	outfile := flag.String("o", "ego.go", "output file")
+	pkgname := flag.String("package", "", "package name")
+	flag.Parse()
 	log.SetFlags(0)
 
-	// Parse the command line flags.
-	flag.Parse()
-	if flag.NArg() == 0 {
-		usage()
+	// If no paths are provided then use the present working directory.
+	roots := flag.Args()
+	if len(roots) == 0 {
+		roots = []string{"."}
 	}
 
-	// Loop over each path and generate all ego templates within it.
-	for _, path := range flag.Args() {
-		if err := filepath.Walk(path, visit); err != nil {
+	// If no package name is set then use the directory name of the output file.
+	if *pkgname == "" {
+		abspath, _ := filepath.Abs(*outfile)
+		*pkgname = filepath.Base(filepath.Dir(abspath))
+		*pkgname = regexp.MustCompile(`(\w+).*`).ReplaceAllString(*pkgname, "$1")
+	}
+
+	// Recursively retrieve all ego templates
+	var v visitor
+	for _, root := range roots {
+		if err := filepath.Walk(root, v.visit); err != nil {
 			scanner.PrintError(os.Stderr, err)
 			os.Exit(1)
 		}
 	}
-}
-
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: ego [OPTIONS] FILE")
-	os.Exit(1)
-}
-
-func visit(path string, info os.FileInfo, err error) error {
-	if info == nil {
-		return fmt.Errorf("file not found: %s", path)
-	} else if info.IsDir() {
-		return visitDir(path)
-	}
-	return nil
-}
-
-func visitDir(path string) error {
-	// List all files in the directory.
-	infos, err := ioutil.ReadDir(path)
-	if err != nil {
-		return err
-	}
 
 	// Parse every *.ego file.
 	var templates []*ego.Template
-	for _, info := range infos {
-		if info.IsDir() || filepath.Ext(info.Name()) != ".ego" {
-			continue
-		}
-
-		// Parse ego file into a template.
-		t, err := ego.ParseFile(filepath.Join(path, info.Name()))
+	for _, path := range v.paths {
+		t, err := ego.ParseFile(path)
 		if err != nil {
-			return err
+			log.Fatal("parse file: ", err)
 		}
 		templates = append(templates, t)
 	}
 
 	// If we have no templates then exit.
 	if len(templates) == 0 {
-		return nil
+		os.Exit(0)
 	}
 
 	// Write package to output file.
-	abspath, _ := filepath.Abs(path)
-	p := &ego.Package{Templates: templates, Name: filepath.Base(abspath)}
-	f, err := os.Create(filepath.Join(path, "ego.go"))
+	p := &ego.Package{Templates: templates, Name: *pkgname}
+	f, err := os.Create(*outfile)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	defer f.Close()
 
 	// Write template to file.
-	if err := p.WriteFormatted(f); err != nil {
-		return err
+	if err := p.Write(f); err != nil {
+		log.Fatal("write: ", err)
 	}
+}
 
+// visitor iterates over
+type visitor struct {
+	paths []string
+}
+
+func (v *visitor) visit(path string, info os.FileInfo, err error) error {
+	if info == nil {
+		return fmt.Errorf("file not found: %s", path)
+	}
+	if !info.IsDir() && filepath.Ext(path) == ".ego" {
+		v.paths = append(v.paths, path)
+	}
 	return nil
 }

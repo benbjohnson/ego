@@ -27,7 +27,7 @@ func TestTemplate_Write(t *testing.T) {
 		},
 	}
 	p := &Package{Templates: []*Template{tmpl}, Name: "foo"}
-	err := p.WriteFormatted(&buf)
+	err := p.Write(&buf)
 	assert.NoError(t, err)
 }
 
