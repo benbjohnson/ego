@@ -31,10 +31,5 @@ func TestTemplate_Write(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func warn(v ...interface{}) {
-	fmt.Fprintln(os.Stderr, v...)
-}
-
-func warnf(msg string, v ...interface{}) {
-	fmt.Fprintf(os.Stderr, msg+"\n", v...)
-}
+func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
+func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }

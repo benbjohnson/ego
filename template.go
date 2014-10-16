@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"os"
 	"path/filepath"
 )
 
@@ -78,6 +79,19 @@ func (t *Template) nonHeaderBlocks() []Block {
 	return blocks
 }
 
+// normalize joins together adjacent text blocks.
+func (t *Template) normalize() {
+	var a []Block
+	for _, b := range t.Blocks {
+		if isTextBlock(b) && len(a) > 0 && isTextBlock(a[len(a)-1]) {
+			a[len(a)-1].(*TextBlock).Content += b.(*TextBlock).Content
+		} else {
+			a = append(a, b)
+		}
+	}
+	t.Blocks = a
+}
+
 // Block represents an element of the template.
 type Block interface {
 	block()
@@ -110,8 +124,14 @@ type TextBlock struct {
 
 func (b *TextBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `if _, err := fmt.Fprintf(w, %q); err != nil { return err }`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = fmt.Fprintf(w, %q)`+"\n", b.Content)
 	return nil
+}
+
+// isTextBlock returns true if the block is a text block.
+func isTextBlock(b Block) bool {
+	_, ok := b.(*TextBlock)
+	return ok
 }
 
 // CodeBlock represents a Go code block that is printed as-is to the template.
@@ -146,7 +166,7 @@ type PrintBlock struct {
 
 func (b *PrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `if _, err := fmt.Fprintf(w, "%%v", %s); err != nil { return err }`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = fmt.Fprintf(w, "%%v", %s)`+"\n", b.Content)
 	return nil
 }
 
@@ -249,3 +269,6 @@ func (p *Package) writeHeader(w io.Writer) error {
 
 	return nil
 }
+
+func warn(v ...interface{})              { fmt.Fprintln(os.Stderr, v...) }
+func warnf(msg string, v ...interface{}) { fmt.Fprintf(os.Stderr, msg+"\n", v...) }
