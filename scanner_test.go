@@ -79,6 +79,13 @@ func TestScannerCodeBlockUnexpectedEOF_4(t *testing.T) {
 	assert.Equal(t, err, io.ErrUnexpectedEOF)
 }
 
+// Ensure that a print code block that ends unexpectedly returns an error.
+func TestScannerCodeBlockUnexpectedEOF_5(t *testing.T) {
+	s := NewScanner(bytes.NewBufferString(`<%=`), "tmpl.ego")
+	_, err := s.Scan()
+	assert.Equal(t, err, io.ErrUnexpectedEOF)
+}
+
 // Ensure that a header block can be scanned.
 func TestScannerHeaderBlock(t *testing.T) {
 	s := NewScanner(bytes.NewBufferString(`<%% import "foo" %%>`), "tmpl.ego")
@@ -127,10 +134,10 @@ func TestScannerHeaderBlockUnexpectedEOF_5(t *testing.T) {
 
 // Ensure that a print block can be scanned.
 func TestScannerPrintBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%= myNum %>`), "tmpl.ego")
+	s := NewScanner(bytes.NewBufferString(`<%== myNum %>`), "tmpl.ego")
 	b, err := s.Scan()
 	assert.NoError(t, err)
-	if b, ok := b.(*PrintBlock); assert.True(t, ok) {
+	if b, ok := b.(*RawPrintBlock); assert.True(t, ok) {
 		assert.Equal(t, b.Content, ` myNum `)
 		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
 	}
@@ -138,9 +145,20 @@ func TestScannerPrintBlock(t *testing.T) {
 
 // Ensure that a print block that ends unexpectedly returns an error.
 func TestScannerPrintBlockUnexpectedEOF(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%= `), "tmpl.ego")
+	s := NewScanner(bytes.NewBufferString(`<%== `), "tmpl.ego")
 	_, err := s.Scan()
 	assert.Equal(t, err, io.ErrUnexpectedEOF)
+}
+
+// Ensure that an escaped print block can be scanned.
+func TestScannerEscapedPrintBlock(t *testing.T) {
+	s := NewScanner(bytes.NewBufferString(`<%= myNum %>`), "tmpl.ego")
+	b, err := s.Scan()
+	assert.NoError(t, err)
+	if b, ok := b.(*PrintBlock); assert.True(t, ok) {
+		assert.Equal(t, b.Content, ` myNum `)
+		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
+	}
 }
 
 // Ensure that a declaration block can be scanned.
@@ -163,11 +181,11 @@ func TestScannerDeclarationBlockUnexpectedEOF(t *testing.T) {
 
 // Ensure that line numbers are tracked correctly.
 func TestScannerMultiline(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString("hello\nworld<%= x \n\n %>goodbye"), "tmpl.ego")
+	s := NewScanner(bytes.NewBufferString("hello\nworld<%== x \n\n %>goodbye"), "tmpl.ego")
 	b, _ := s.Scan()
 	assert.Equal(t, b.(*TextBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 1})
 	b, _ = s.Scan()
-	assert.Equal(t, b.(*PrintBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 2})
+	assert.Equal(t, b.(*RawPrintBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 2})
 	b, _ = s.Scan()
 	assert.Equal(t, b.(*TextBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 4})
 }

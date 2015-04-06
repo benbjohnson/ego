@@ -20,7 +20,7 @@ func TestTemplate_Write(t *testing.T) {
 			&DeclarationBlock{Content: " func MyTemplate(w io.Writer, nums []int) error "},
 			&CodeBlock{Content: "  for _, num := range nums {"},
 			&TextBlock{Content: "    <p>"},
-			&PrintBlock{Content: "num + 1"},
+			&RawPrintBlock{Content: "num + 1"},
 			&TextBlock{Content: "    </p>"},
 			&CodeBlock{Content: "  }"},
 			&TextBlock{Content: "</html>"},

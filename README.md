@@ -26,7 +26,9 @@ An ego template is made up of several types of blocks:
 
 * **Code Block** - These blocks execute raw Go code: `<% var foo = "bar" %>`
 
-* **Print Block** - These blocks print a Go expression: `<%= myVar %>`
+* **Print Block** - These blocks print a Go expression. They use `html.EscapeString` to escape it before outputting: `<%= myVar %>`
+
+* **Raw Print Block** - These blocks print a Go expression raw into the HTML: `<%== "<script>" %>`
 
 * **Header Block** - These blocks allow you to import packages: `<%% import "encoding/json" %%>`
 
