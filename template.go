@@ -14,7 +14,7 @@ import (
 
 // Template represents an entire Ego template.
 // A template consists of a declaration block followed by zero or more blocks.
-// Blocks can be either a TextBlock, a PrintBlock, or a CodeBlock.
+// Blocks can be either a TextBlock, a PrintBlock, a RawPrintBlock, or a CodeBlock.
 type Template struct {
 	Path   string
 	Blocks []Block
@@ -79,6 +79,15 @@ func (t *Template) nonHeaderBlocks() []Block {
 	return blocks
 }
 
+func (t *Template) hasEscapedPrintBlock() bool {
+	for _, b := range t.Blocks {
+		if _, ok := b.(*PrintBlock); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // normalize joins together adjacent text blocks.
 func (t *Template) normalize() {
 	var a []Block
@@ -102,6 +111,7 @@ func (b *DeclarationBlock) block() {}
 func (b *TextBlock) block()        {}
 func (b *CodeBlock) block()        {}
 func (b *HeaderBlock) block()      {}
+func (b *RawPrintBlock) block()    {}
 func (b *PrintBlock) block()       {}
 
 // DeclarationBlock represents a block that declaration the function signature.
@@ -158,7 +168,19 @@ func (b *HeaderBlock) write(buf *bytes.Buffer) error {
 	return nil
 }
 
-// PrintBlock represents a block of the template that is printed out to the writer.
+// RawPrintBlock represents a block of the template that is printed out to the writer.
+type RawPrintBlock struct {
+	Pos     Pos
+	Content string
+}
+
+func (b *RawPrintBlock) write(buf *bytes.Buffer) error {
+	b.Pos.write(buf)
+	fmt.Fprintf(buf, `_, _ = fmt.Fprintf(w, "%%v", %s)`+"\n", b.Content)
+	return nil
+}
+
+// PrintBlock represents a block that will HTML escape the contents before outputting
 type PrintBlock struct {
 	Pos     Pos
 	Content string
@@ -166,7 +188,7 @@ type PrintBlock struct {
 
 func (b *PrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `_, _ = fmt.Fprintf(w, "%%v", %s)`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, html.EscapeString(fmt.Sprintf("%%v", %s)))`+"\n", b.Content)
 	return nil
 }
 
@@ -237,7 +259,15 @@ func (p *Package) writeHeader(w io.Writer) error {
 	var decls = map[string]bool{`:"fmt"`: true, `:"io"`: true}
 	fmt.Fprint(&buf, "import (\n")
 	fmt.Fprintln(&buf, `"fmt"`)
+	for _, t := range p.Templates {
+		if t.hasEscapedPrintBlock() {
+			fmt.Fprintln(&buf, `"html"`)
+			decls["html"] = true
+			break
+		}
+	}
 	fmt.Fprintln(&buf, `"io"`)
+
 	for _, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
 		if !ok || d.Tok != token.IMPORT {

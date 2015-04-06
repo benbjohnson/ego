@@ -63,7 +63,18 @@ func (s *Scanner) scanCodeBlock() (Block, error) {
 	case '%':
 		return s.scanHeaderBlock()
 	case '=':
-		return s.scanPrintBlock()
+		ch, err := s.read()
+		if err == io.EOF {
+			return nil, io.ErrUnexpectedEOF
+		} else if err != nil {
+			return nil, err
+		}
+		if ch == '=' {
+			return s.scanRawPrintBlock()
+		} else {
+			s.unread()
+			return s.scanPrintBlock()
+		}
 	}
 
 	// Otherwise read the contents of the code block.
@@ -91,6 +102,16 @@ func (s *Scanner) scanDeclarationBlock() (Block, error) {
 func (s *Scanner) scanHeaderBlock() (Block, error) {
 	b := &HeaderBlock{Pos: s.pos}
 	content, err := s.scanHeaderContent()
+	if err != nil {
+		return nil, err
+	}
+	b.Content = content
+	return b, nil
+}
+
+func (s *Scanner) scanRawPrintBlock() (Block, error) {
+	b := &RawPrintBlock{Pos: s.pos}
+	content, err := s.scanContent()
 	if err != nil {
 		return nil, err
 	}
