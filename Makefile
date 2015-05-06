@@ -1,20 +1,20 @@
-TEST=.
-BENCH=.
-COVERPROFILE=/tmp/c.out
+VERSION=0.1.0
+GOLDFLAGS="-X main.version $(VERSION)"
 
-# http://cloc.sourceforge.net/
-cloc:
-	@cloc --not-match-f='Makefile|_test.go' .
+default:
 
-cover: fmt
-	go test -coverprofile=$(COVERPROFILE) -test.run=$(TEST) .
-	go tool cover -html=$(COVERPROFILE)
-	rm $(COVERPROFILE)
+release: release-windows release-darwin release-linux
 
-fmt:
-	@go fmt ./...
+release-windows:
+	mkdir -p bin/windows/amd64
+	GOOS=windows GOARCH=amd64 go build -ldflags=$(GOLDFLAGS) -o bin/windows/amd64/ego ./cmd/ego
 
-test: fmt
-	@go test -v -cover -test.run=$(TEST)
+release-darwin:
+	mkdir -p bin/darwin/amd64
+	GOOS=darwin GOARCH=amd64 go build -ldflags=$(GOLDFLAGS) -o bin/darwin/amd64/ego ./cmd/ego
 
-.PHONY: cloc cover fmt test
+release-linux:
+	mkdir -p bin/linux/amd64
+	GOOS=linux GOARCH=amd64 go build -ldflags=$(GOLDFLAGS) -o bin/linux/amd64/ego ./cmd/ego
+
+.PHONY: default release

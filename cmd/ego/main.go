@@ -12,11 +12,21 @@ import (
 	"github.com/benbjohnson/ego"
 )
 
+// version is set by the makefile during build.
+var version string
+
 func main() {
 	outfile := flag.String("o", "ego.go", "output file")
 	pkgname := flag.String("package", "", "package name")
+	versionFlag := flag.Bool("version", false, "print version")
 	flag.Parse()
 	log.SetFlags(0)
+
+	// If the version flag is set then print the version.
+	if *versionFlag {
+		fmt.Printf("ego v%s\n", version)
+		return
+	}
 
 	// If no paths are provided then use the present working directory.
 	roots := flag.Args()
