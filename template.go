@@ -218,7 +218,7 @@ func (p *Package) Write(w io.Writer) error {
 
 	for _, t := range p.Templates {
 		if err := t.Write(w); err != nil {
-			return fmt.Errorf("template: %s: err", t.Path)
+			return fmt.Errorf("template: %s: %s", t.Path, err)
 		}
 	}
 
