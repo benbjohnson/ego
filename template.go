@@ -298,7 +298,7 @@ func (p *Package) writeHeader(w io.Writer) error {
 	}
 	fmt.Fprint(&buf, ")\n")
 
-	fmt.Fprint(&buf, `var compatibility = fmt.Sprint("") // just so that we can keep the fmt import for now`+"\n")
+	fmt.Fprint(&buf, `var _ = fmt.Sprint("") // just so that we can keep the fmt import for now`+"\n")
 
 	// Write out to writer.
 	buf.WriteTo(w)
