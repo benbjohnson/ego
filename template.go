@@ -133,7 +133,7 @@ type TextBlock struct {
 
 func (b *TextBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, %q)`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = io.WriteString(w, %q)`+"\n", b.Content)
 	return nil
 }
 
@@ -187,7 +187,7 @@ type PrintBlock struct {
 
 func (b *PrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, html.EscapeString(fmt.Sprintf("%%v", %s)))`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = io.WriteString(w, html.EscapeString(fmt.Sprintf("%%v", %s)))`+"\n", b.Content)
 	return nil
 }
 
@@ -297,6 +297,8 @@ func (p *Package) writeHeader(w io.Writer) error {
 		}
 	}
 	fmt.Fprint(&buf, ")\n")
+
+	fmt.Fprint(&buf, `var _ = fmt.Sprint("") // just so that we can keep the fmt import for now`+"\n")
 
 	// Write out to writer.
 	buf.WriteTo(w)
