@@ -8,19 +8,35 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/benbjohnson/ego"
 )
 
 // version is set by the makefile during build.
 var version string
+var extensions []string
 
 func main() {
 	outfile := flag.String("o", "ego.go", "output file")
 	pkgname := flag.String("package", "", "package name")
 	versionFlag := flag.Bool("version", false, "print version")
+	extFlag := flag.String("ext", ".ego", "all file extensions to scan,use '|' for separation")
 	flag.Parse()
 	log.SetFlags(0)
+
+	//parse extentions
+	exts := strings.Split(*extFlag, "|")
+	for _, ext := range exts {
+		ext = strings.TrimSpace(ext)
+		if len(ext) == 0 {
+			continue
+		}
+		if ext[0] != '.' {
+			ext = "." + ext
+		}
+		extensions = append(extensions, ext)
+	}
 
 	// If the version flag is set then print the version.
 	if *versionFlag {
@@ -84,11 +100,20 @@ type visitor struct {
 	paths []string
 }
 
+func match_ext(ext string) bool {
+	for _, e := range extensions {
+		if e == ext {
+			return true
+		}
+	}
+	return false
+}
+
 func (v *visitor) visit(path string, info os.FileInfo, err error) error {
 	if info == nil {
 		return fmt.Errorf("file not found: %s", path)
 	}
-	if !info.IsDir() && filepath.Ext(path) == ".ego" {
+	if !info.IsDir() && match_ext(filepath.Ext(path)) {
 		v.paths = append(v.paths, path)
 	}
 	return nil
