@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 
 	"github.com/benbjohnson/ego"
 )
@@ -50,15 +51,23 @@ func main() {
 		}
 	}
 
+	var wg sync.WaitGroup
+
 	// Parse every *.ego file.
 	var templates []*ego.Template
 	for _, path := range v.paths {
-		t, err := ego.ParseFile(path)
-		if err != nil {
-			log.Fatal("parse file: ", err)
-		}
-		templates = append(templates, t)
+		wg.Add(1)
+		go func() {
+			t, err := ego.ParseFile(path)
+			if err != nil {
+				log.Fatal("parse file: ", err)
+			}
+			templates = append(templates, t)
+			defer wg.Done()
+		}()
 	}
+
+	wg.Wait()
 
 	// If we have no templates then exit.
 	if len(templates) == 0 {
