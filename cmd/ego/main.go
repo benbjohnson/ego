@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/benbjohnson/ego"
 )
@@ -16,9 +17,12 @@ import (
 var version string
 
 func main() {
+	start := time.Now()
+
 	outfile := flag.String("o", "ego.go", "output file")
 	pkgname := flag.String("package", "", "package name")
 	versionFlag := flag.Bool("version", false, "print version")
+	verbose := flag.Bool("verbose", false, "verbose output")
 	flag.Parse()
 	log.SetFlags(0)
 
@@ -41,8 +45,14 @@ func main() {
 		*pkgname = regexp.MustCompile(`(\w+).*`).ReplaceAllString(*pkgname, "$1")
 	}
 
-	// Recursively retrieve all ego templates
 	var v visitor
+
+	fileInfo, err := os.Stat(*outfile)
+	if err == nil {
+		v.outfileModTime = fileInfo.ModTime()
+	}
+
+	// Recursively retrieve all ego templates
 	for _, root := range roots {
 		if err := filepath.Walk(root, v.visit); err != nil {
 			scanner.PrintError(os.Stderr, err)
@@ -50,9 +60,19 @@ func main() {
 		}
 	}
 
+	if !v.anyFilesChanged {
+		if *verbose {
+			fmt.Printf("nothing to do\n")
+		}
+		os.Exit(0)
+	}
+
 	// Parse every *.ego file.
 	var templates []*ego.Template
 	for _, path := range v.paths {
+		if *verbose {
+			fmt.Printf("parsing file: %s\n", path)
+		}
 		t, err := ego.ParseFile(path)
 		if err != nil {
 			log.Fatal("parse file: ", err)
@@ -62,6 +82,9 @@ func main() {
 
 	// If we have no templates then exit.
 	if len(templates) == 0 {
+		if *verbose {
+			fmt.Printf("no templates found\n")
+		}
 		os.Exit(0)
 	}
 
@@ -73,15 +96,26 @@ func main() {
 	}
 	defer f.Close()
 
+	if *verbose {
+		fmt.Printf("writing %s\n", *outfile)
+	}
+
 	// Write template to file.
 	if err := p.Write(f); err != nil {
 		log.Fatal("write: ", err)
+	}
+
+	if *verbose {
+		elapsed := time.Since(start)
+		fmt.Printf("ego finished in %s\n", elapsed)
 	}
 }
 
 // visitor iterates over
 type visitor struct {
-	paths []string
+	outfileModTime  time.Time
+	paths           []string
+	anyFilesChanged bool
 }
 
 func (v *visitor) visit(path string, info os.FileInfo, err error) error {
@@ -90,6 +124,9 @@ func (v *visitor) visit(path string, info os.FileInfo, err error) error {
 	}
 	if !info.IsDir() && filepath.Ext(path) == ".ego" {
 		v.paths = append(v.paths, path)
+		if info.ModTime().After(v.outfileModTime) {
+			v.anyFilesChanged = true
+		}
 	}
 	return nil
 }
