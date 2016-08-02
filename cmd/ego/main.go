@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"go/scanner"
 	"log"
 	"os"
@@ -19,6 +21,7 @@ func main() {
 	outfile := flag.String("o", "ego.go", "output file")
 	pkgname := flag.String("package", "", "package name")
 	versionFlag := flag.Bool("version", false, "print version")
+	runFmt := flag.Bool("fmt", true, "run go fmt on the result")
 	flag.Parse()
 	log.SetFlags(0)
 
@@ -67,14 +70,27 @@ func main() {
 
 	// Write package to output file.
 	p := &ego.Package{Templates: templates, Name: *pkgname}
+
+	var buf bytes.Buffer
+	// Write template to buffer.
+	if err := p.Write(&buf); err != nil {
+		log.Fatal("template write: ", err)
+	}
+
+	result := buf.Bytes()
+	if *runFmt {
+		var err error
+		if result, err = format.Source(result); err != nil {
+			log.Fatal("format: ", err)
+		}
+	}
+
 	f, err := os.Create(*outfile)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
-
-	// Write template to file.
-	if err := p.Write(f); err != nil {
+	if _, err = f.Write(result); err != nil {
 		log.Fatal("write: ", err)
 	}
 }
