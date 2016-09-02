@@ -175,7 +175,7 @@ type RawPrintBlock struct {
 
 func (b *RawPrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `_, _ = fmt.Fprintf(w, "%%v", %s)`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, %s)`+"\n", b.Content)
 	return nil
 }
 
@@ -187,7 +187,7 @@ type PrintBlock struct {
 
 func (b *PrintBlock) write(buf *bytes.Buffer) error {
 	b.Pos.write(buf)
-	fmt.Fprintf(buf, `_, _ = io.WriteString(w, html.EscapeString(fmt.Sprintf("%%v", %s)))`+"\n", b.Content)
+	fmt.Fprintf(buf, `_, _ = io.WriteString(w, html.EscapeString(fmt.Sprint(%s)))`+"\n", b.Content)
 	return nil
 }
 
