@@ -19,7 +19,7 @@ func Parse(r io.Reader, path string) (*Template, error) {
 		}
 		t.Blocks = append(t.Blocks, b)
 	}
-	t.normalize()
+	t.Normalize()
 	return t, nil
 }
 
