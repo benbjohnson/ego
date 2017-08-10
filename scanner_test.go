@@ -3,197 +3,130 @@ package ego_test
 import (
 	"bytes"
 	"io"
+	"reflect"
 	"testing"
 
-	. "github.com/benbjohnson/ego"
-	"github.com/stretchr/testify/assert"
+	"github.com/benbjohnson/ego"
 )
 
 // Ensure that a text block can be scanned.
-func TestScannerTextBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString("hello world"), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*TextBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, "hello world")
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
+func TestScanner(t *testing.T) {
+	t.Run("TextBlock", func(t *testing.T) {
+		t.Run("OK", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString("hello world"), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.TextBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != "hello world" {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
+				t.Fatalf("unexpected pos: %#v", blk.Pos)
+			}
+		})
 
-// Ensure that a text block with a single "<" returns.
-func TestScannerTextBlockSingleLT(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString("<"), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*TextBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, "<")
-	}
-}
+		t.Run("SingleLT", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString("<"), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.TextBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != "<" {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			}
+		})
 
-// Ensure that a text block starting with a "<" returns.
-func TestScannerTextBlockStartingLT(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString("<html>"), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*TextBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, "<html>")
-	}
-}
+		t.Run("SingleLT", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString("<html>"), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.TextBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != "<html>" {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			}
+		})
+	})
 
-// Ensure that a code block can be scanned.
-func TestScannerCodeBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<% x := 1 %>`), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*CodeBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, ` x := 1 `)
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
+	t.Run("CodeBlock", func(t *testing.T) {
+		t.Run("OK", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<% x := 1 %>`), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.CodeBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != " x := 1 " {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
+				t.Fatalf("unexpected pos: %#v", blk.Pos)
+			}
+		})
 
-// Ensure that a code block that ends unexpectedly returns an error.
-func TestScannerCodeBlockUnexpectedEOF_1(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		t.Run("UnexpectedEOF/1", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<%`), "tmpl.ego")
+			if _, err := s.Scan(); err != io.ErrUnexpectedEOF {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
 
-// Ensure that a code block that ends unexpectedly returns an error.
-func TestScannerCodeBlockUnexpectedEOF_2(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<% x = 2`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		t.Run("UnexpectedEOF/2", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<% x = 2`), "tmpl.ego")
+			if _, err := s.Scan(); err != io.ErrUnexpectedEOF {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
 
-// Ensure that a code block that ends unexpectedly returns an error.
-func TestScannerCodeBlockUnexpectedEOF_3(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<% x = 2 %`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		t.Run("UnexpectedEOF/3", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<% x = 2 %`), "tmpl.ego")
+			if _, err := s.Scan(); err != io.ErrUnexpectedEOF {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
 
-// Ensure that a code block that ends unexpectedly returns an error.
-func TestScannerCodeBlockUnexpectedEOF_4(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<% x = 2 % `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		t.Run("UnexpectedEOF/4", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<% x = 2 % `), "tmpl.ego")
+			if _, err := s.Scan(); err != io.ErrUnexpectedEOF {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
+	})
 
-// Ensure that a print code block that ends unexpectedly returns an error.
-func TestScannerCodeBlockUnexpectedEOF_5(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%=`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+	t.Run("PrintBlock", func(t *testing.T) {
+		t.Run("UnexpectedEOF", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<%=`), "tmpl.ego")
+			if _, err := s.Scan(); err != io.ErrUnexpectedEOF {
+				t.Fatalf("unexpected error: %s", err)
+			}
+		})
+	})
 
-// Ensure that a header block can be scanned.
-func TestScannerHeaderBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" %%>`), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*HeaderBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, ` import "foo" `)
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
+	t.Run("Multiline", func(t *testing.T) {
+		s := ego.NewScanner(bytes.NewBufferString("hello\nworld<%== x \n\n %>goodbye"), "tmpl.ego")
+		if blk, err := s.Scan(); err != nil {
+			t.Fatal(err)
+		} else if pos := blk.BlockPos(); !reflect.DeepEqual(pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
+			t.Fatalf("unexpected pos(0): %#v", pos)
+		}
 
-// Ensure that a header block that ends unexpectedly returns an error.
-func TestScannerHeaderBlockUnexpectedEOF_1(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		if blk, err := s.Scan(); err != nil {
+			t.Fatal(err)
+		} else if pos := blk.BlockPos(); !reflect.DeepEqual(pos, ego.Pos{Path: "tmpl.ego", LineNo: 2}) {
+			t.Fatalf("unexpected pos(1): %#v", pos)
+		}
 
-// Ensure that a header block that ends unexpectedly returns an error.
-func TestScannerHeaderBlockUnexpectedEOF_2(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" %`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
+		if blk, err := s.Scan(); err != nil {
+			t.Fatal(err)
+		} else if pos := blk.BlockPos(); !reflect.DeepEqual(pos, ego.Pos{Path: "tmpl.ego", LineNo: 4}) {
+			t.Fatalf("unexpected pos(2): %#v", pos)
+		}
+	})
 
-// Ensure that a header block that ends unexpectedly returns an error.
-func TestScannerHeaderBlockUnexpectedEOF_3(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" % `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
-
-// Ensure that a header block that ends unexpectedly returns an error.
-func TestScannerHeaderBlockUnexpectedEOF_4(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" %%`), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
-
-// Ensure that a header block that ends unexpectedly returns an error.
-func TestScannerHeaderBlockUnexpectedEOF_5(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%% import "foo" %% `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
-
-// Ensure that a print block can be scanned.
-func TestScannerPrintBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%== myNum %>`), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*RawPrintBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, ` myNum `)
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
-
-// Ensure that a print block that ends unexpectedly returns an error.
-func TestScannerPrintBlockUnexpectedEOF(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%== `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
-
-// Ensure that an escaped print block can be scanned.
-func TestScannerEscapedPrintBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%= myNum %>`), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*PrintBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, ` myNum `)
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
-
-// Ensure that a declaration block can be scanned.
-func TestScannerDeclarationBlock(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%! MyTemplate(w io.Writer) error %>`), "tmpl.ego")
-	b, err := s.Scan()
-	assert.NoError(t, err)
-	if b, ok := b.(*DeclarationBlock); assert.True(t, ok) {
-		assert.Equal(t, b.Content, ` MyTemplate(w io.Writer) error `)
-		assert.Equal(t, b.Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	}
-}
-
-// Ensure that a declaration block that ends unexpectedly returns an error.
-func TestScannerDeclarationBlockUnexpectedEOF(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString(`<%! `), "tmpl.ego")
-	_, err := s.Scan()
-	assert.Equal(t, err, io.ErrUnexpectedEOF)
-}
-
-// Ensure that line numbers are tracked correctly.
-func TestScannerMultiline(t *testing.T) {
-	s := NewScanner(bytes.NewBufferString("hello\nworld<%== x \n\n %>goodbye"), "tmpl.ego")
-	b, _ := s.Scan()
-	assert.Equal(t, b.(*TextBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 1})
-	b, _ = s.Scan()
-	assert.Equal(t, b.(*RawPrintBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 2})
-	b, _ = s.Scan()
-	assert.Equal(t, b.(*TextBlock).Pos, Pos{Path: "tmpl.ego", LineNo: 4})
-}
-
-// Ensure that EOF returns an error.
-func TestScannerEOF(t *testing.T) {
-	s := NewScanner(bytes.NewBuffer(nil), "tmpl.ego")
-	b, err := s.Scan()
-	assert.Equal(t, err, io.EOF)
-	assert.Nil(t, b)
+	t.Run("EOF", func(t *testing.T) {
+		s := ego.NewScanner(bytes.NewBuffer(nil), "tmpl.ego")
+		if blk, err := s.Scan(); err != io.EOF {
+			t.Fatalf("unexpected error: %#v", err)
+		} else if blk != nil {
+			t.Fatalf("expected nil block, got: %#v", blk)
+		}
+	})
 }

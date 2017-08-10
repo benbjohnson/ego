@@ -30,25 +30,19 @@ An ego template is made up of several types of blocks:
 
 * **Raw Print Block** - These blocks print a Go expression raw into the HTML: `<%== "<script>" %>`
 
-* **Header Block** - These blocks allow you to import packages: `<%% import "encoding/json" %%>`
-
-* **Declaration Block** - This block defines the function signature for your template.
-
-A single declaration block should exist at the top of your template and accept an `w io.Writer` and return an `error`. Other arguments can be added as needed. A function receiver can also be used.
-
-```
-<%! func MyTmpl(w io.Writer) error %>
-```
-
 
 ## Example
 
 Below is an example ego template for a web page:
 
 ```ego
-<%! func MyTmpl(w io.Writer, u *User) error %>
+<%
+package mypkg
 
-<%% import "strings" %%>
+import "strings"
+
+func MyTmpl(w io.Writer, u *User) {
+%>
 
 <html>
   <body>
@@ -62,6 +56,8 @@ Below is an example ego template for a web page:
     </ul>
   </body>
 </html>
+
+<% } %>
 ```
 
 Once this template is compiled you can call it using the definition you specified:
@@ -72,7 +68,7 @@ myUser := &User{
   FavoriteColors: []string{"blue", "green", "mauve"},
 }
 var buf bytes.Buffer
-err := mypkg.MyTmpl(&buf, myUser)
+mypkg.MyTmpl(&buf, myUser)
 ```
 
 

@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-// Scanner is a tokenizer for Ego templates.
+// Scanner is a tokenizer for ego templates.
 type Scanner struct {
 	r   *bufio.Reader
 	pos Pos
@@ -58,10 +58,6 @@ func (s *Scanner) scanCodeBlock() (Block, error) {
 
 	// Check the next character to see if it's a special type of block.
 	switch ch {
-	case '!':
-		return s.scanDeclarationBlock()
-	case '%':
-		return s.scanHeaderBlock()
 	case '=':
 		ch, err := s.read()
 		if err == io.EOF {
@@ -86,26 +82,6 @@ func (s *Scanner) scanCodeBlock() (Block, error) {
 	}
 	b.Content = content
 
-	return b, nil
-}
-
-func (s *Scanner) scanDeclarationBlock() (Block, error) {
-	b := &DeclarationBlock{Pos: s.pos}
-	content, err := s.scanContent()
-	if err != nil {
-		return nil, err
-	}
-	b.Content = content
-	return b, nil
-}
-
-func (s *Scanner) scanHeaderBlock() (Block, error) {
-	b := &HeaderBlock{Pos: s.pos}
-	content, err := s.scanHeaderContent()
-	if err != nil {
-		return nil, err
-	}
-	b.Content = content
 	return b, nil
 }
 
@@ -162,39 +138,6 @@ func (s *Scanner) scanContent() (string, error) {
 				return "", io.ErrUnexpectedEOF
 			} else if ch == '>' {
 				break
-			} else {
-				buf.WriteRune('%')
-				buf.WriteRune(ch)
-			}
-		} else {
-			buf.WriteRune(ch)
-		}
-	}
-	return string(buf.Bytes()), nil
-}
-
-// scans the reader until %%> is reached.
-func (s *Scanner) scanHeaderContent() (string, error) {
-	var buf bytes.Buffer
-	for {
-		ch, err := s.read()
-		if err == io.EOF {
-			return "", io.ErrUnexpectedEOF
-		} else if ch == '%' {
-			ch, err := s.read()
-			if err == io.EOF {
-				return "", io.ErrUnexpectedEOF
-			} else if ch == '%' {
-				ch, err := s.read()
-				if err == io.EOF {
-					return "", io.ErrUnexpectedEOF
-				} else if ch == '>' {
-					break
-				} else {
-					buf.WriteRune('%')
-					buf.WriteRune('%')
-					buf.WriteRune(ch)
-				}
 			} else {
 				buf.WriteRune('%')
 				buf.WriteRune(ch)
