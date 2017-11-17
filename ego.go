@@ -29,42 +29,7 @@ func (t *Template) WriteTo(w io.Writer) (n int64, err error) {
 	buf.WriteString("// DO NOT EDIT\n\n")
 
 	// Write blocks.
-	for _, blk := range t.Blocks {
-		// Write line comment.
-		if pos := blk.BlockPos(); pos.Path != "" && pos.LineNo > 0 {
-			nn, err := fmt.Fprintf(&buf, "//line %s:%d\n", pos.Path, pos.LineNo)
-			if n += int64(nn); err != nil {
-				return n, err
-			}
-		}
-
-		// Write block.
-		switch blk := blk.(type) {
-		case *TextBlock:
-			nn, err := fmt.Fprintf(&buf, `_, _ = io.WriteString(w, %q)`+"\n", blk.Content)
-			if n += int64(nn); err != nil {
-				return n, err
-			}
-
-		case *CodeBlock:
-			nn, err := fmt.Fprintln(&buf, blk.Content)
-			if n += int64(nn); err != nil {
-				return n, err
-			}
-
-		case *PrintBlock:
-			nn, err := fmt.Fprintf(&buf, `_, _ = io.WriteString(w, html.EscapeString(fmt.Sprint(%s)))`+"\n", blk.Content)
-			if n += int64(nn); err != nil {
-				return n, err
-			}
-
-		case *RawPrintBlock:
-			nn, err := fmt.Fprintf(&buf, `_, _ = fmt.Fprint(w, %s)`+"\n", blk.Content)
-			if n += int64(nn); err != nil {
-				return n, err
-			}
-		}
-	}
+	writeBlocksTo(&buf, t.Blocks)
 
 	// Parse buffer as a Go file.
 	fset := token.NewFileSet()
@@ -88,16 +53,62 @@ func (t *Template) WriteTo(w io.Writer) (n int64, err error) {
 	return result.WriteTo(w)
 }
 
-// Normalize joins together adjacent text blocks.
-func (t *Template) Normalize() {
-	t.joinAdjacentTextBlocks()
-	t.trimTrailingEmptyTextBlocks()
+func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
+	for _, blk := range blks {
+		// Write line comment.
+		if pos := Position(blk); pos.Path != "" && pos.LineNo > 0 {
+			fmt.Fprintf(buf, "//line %s:%d\n", pos.Path, pos.LineNo)
+		}
+
+		// Write block.
+		switch blk := blk.(type) {
+		case *TextBlock:
+			fmt.Fprintf(buf, `_, _ = io.WriteString(w, %q)`+"\n", blk.Content)
+
+		case *CodeBlock:
+			fmt.Fprintln(buf, blk.Content)
+
+		case *PrintBlock:
+			fmt.Fprintf(buf, `_, _ = io.WriteString(w, html.EscapeString(fmt.Sprint(%s)))`+"\n", blk.Content)
+
+		case *RawPrintBlock:
+			fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, %s)`+"\n", blk.Content)
+
+		case *ComponentStartBlock:
+			fmt.Fprintf(buf, "{ egoComponent := %s{\n", blk.Name)
+
+			for _, field := range blk.Fields {
+				fmt.Fprintf(buf, "%s: %s,\n", field.Name, field.Value)
+			}
+
+			for _, attr := range blk.Attrs {
+				fmt.Fprintf(buf, "%s: func() {\n", attr.Name)
+				writeBlocksTo(buf, attr.Yield)
+				fmt.Fprint(buf, "},\n")
+			}
+
+			if len(blk.Yield) > 0 {
+				buf.WriteString("Yield: func() {\n")
+				writeBlocksTo(buf, blk.Yield)
+				buf.WriteString("},\n")
+			}
+
+			fmt.Fprint(buf, "}\negoComponent.Render(ctx, w) }\n")
+		}
+	}
 }
 
-func (t *Template) joinAdjacentTextBlocks() {
-	var a []Block
+// Normalize joins together adjacent text blocks.
+func normalizeBlocks(a []Block) []Block {
+	a = joinAdjacentTextBlocks(a)
+	a = trimTrailingEmptyTextBlocks(a)
+	return a
+}
+
+func joinAdjacentTextBlocks(a []Block) []Block {
+	var other []Block
 	var hasTextBlock bool
-	for _, blk := range t.Blocks {
+	for _, blk := range a {
 		curr, isTextBlock := blk.(*TextBlock)
 
 		// Trim left space from the first text block. Discard empty blocks.
@@ -112,15 +123,15 @@ func (t *Template) joinAdjacentTextBlocks() {
 		}
 
 		// Always append the first block.
-		if len(a) == 0 {
-			a = append(a, blk)
+		if len(other) == 0 {
+			other = append(other, blk)
 			continue
 		}
 
 		// Simply append if this block or prev block are not text blocks.
-		prev, isPrevTextBlock := a[len(a)-1].(*TextBlock)
+		prev, isPrevTextBlock := other[len(other)-1].(*TextBlock)
 		if !isTextBlock || !isPrevTextBlock {
-			a = append(a, blk)
+			other = append(other, blk)
 			continue
 		}
 
@@ -128,22 +139,23 @@ func (t *Template) joinAdjacentTextBlocks() {
 		prev.Content += curr.Content
 	}
 
-	t.Blocks = a
+	return other
 }
 
-func (t *Template) trimTrailingEmptyTextBlocks() {
-	for len(t.Blocks) > 0 {
-		blk, ok := t.Blocks[len(t.Blocks)-1].(*TextBlock)
+func trimTrailingEmptyTextBlocks(a []Block) []Block {
+	for len(a) > 0 {
+		blk, ok := a[len(a)-1].(*TextBlock)
 		if !ok || strings.TrimSpace(blk.Content) != "" {
-			return
+			break
 		}
-		t.Blocks[len(t.Blocks)-1] = nil
-		t.Blocks = t.Blocks[:len(t.Blocks)-1]
+		a[len(a)-1] = nil
+		a = a[:len(a)-1]
 	}
+	return a
 }
 
 func injectImports(f *ast.File) {
-	names := []string{`"fmt"`, `"html"`, `"io"`}
+	names := []string{`"fmt"`, `"html"`, `"io"`, `"context"`}
 
 	// Strip packages from existing imports.
 	for i := 0; i < len(f.Decls); i++ {
@@ -190,6 +202,12 @@ func injectImports(f *ast.File) {
 	f.Decls = append(f.Decls, &ast.GenDecl{
 		Tok: token.VAR,
 		Specs: []ast.Spec{
+			&ast.ValueSpec{Names: []*ast.Ident{{Name: "_"}}, Type: &ast.Ident{Name: "context.Context"}},
+		},
+	})
+	f.Decls = append(f.Decls, &ast.GenDecl{
+		Tok: token.VAR,
+		Specs: []ast.Spec{
 			&ast.ValueSpec{Names: []*ast.Ident{{Name: "_"}}, Values: []ast.Expr{&ast.Ident{Name: "html.EscapeString"}}},
 		},
 	})
@@ -213,8 +231,17 @@ func removeImportSpecs(decl *ast.GenDecl, names []string) {
 
 // Block represents an element of the template.
 type Block interface {
-	BlockPos() Pos
+	block()
 }
+
+func (*TextBlock) block()           {}
+func (*CodeBlock) block()           {}
+func (*PrintBlock) block()          {}
+func (*RawPrintBlock) block()       {}
+func (*ComponentStartBlock) block() {}
+func (*ComponentEndBlock) block()   {}
+func (*AttrStartBlock) block()      {}
+func (*AttrEndBlock) block()        {}
 
 // TextBlock represents a UTF-8 encoded block of text that is written to the writer as-is.
 type TextBlock struct {
@@ -222,26 +249,11 @@ type TextBlock struct {
 	Content string
 }
 
-// BlockPos returns the position for the block.
-func (blk *TextBlock) BlockPos() Pos { return blk.Pos }
-
 // CodeBlock represents a Go code block that is printed as-is to the template.
 type CodeBlock struct {
 	Pos     Pos
 	Content string
 }
-
-// BlockPos returns the position for the block.
-func (blk *CodeBlock) BlockPos() Pos { return blk.Pos }
-
-// RawPrintBlock represents a block of the template that is printed out to the writer.
-type RawPrintBlock struct {
-	Pos     Pos
-	Content string
-}
-
-// BlockPos returns the position for the block.
-func (blk *RawPrintBlock) BlockPos() Pos { return blk.Pos }
 
 // PrintBlock represents a block that will HTML escape the contents before outputting
 type PrintBlock struct {
@@ -249,8 +261,88 @@ type PrintBlock struct {
 	Content string
 }
 
-// BlockPos returns the position for the block.
-func (blk *PrintBlock) BlockPos() Pos { return blk.Pos }
+// RawPrintBlock represents a block of the template that is printed out to the writer.
+type RawPrintBlock struct {
+	Pos     Pos
+	Content string
+}
+
+// ComponentStartBlock represents the opening block of an ego component.
+type ComponentStartBlock struct {
+	Pos    Pos
+	Name   string
+	Closed bool
+	Fields []*Field
+	Attrs  []*AttrStartBlock
+	Yield  []Block
+}
+
+// ComponentEndBlock represents the closing block of an ego component.
+type ComponentEndBlock struct {
+	Pos  Pos
+	Name string
+}
+
+// AttrStartBlock represents the opening block of an ego component attribute.
+type AttrStartBlock struct {
+	Pos   Pos
+	Name  string
+	Yield []Block
+}
+
+// AttrEndBlock represents the closing block of an ego component attribute.
+type AttrEndBlock struct {
+	Pos  Pos
+	Name string
+}
+
+func shortComponentBlockString(blk Block) string {
+	switch blk := blk.(type) {
+	case *ComponentStartBlock:
+		return fmt.Sprintf("<ego:%s>", blk.Name)
+	case *ComponentEndBlock:
+		return fmt.Sprintf("</ego:%s>", blk.Name)
+	case *AttrStartBlock:
+		return fmt.Sprintf("<ego::%s>", blk.Name)
+	case *AttrEndBlock:
+		return fmt.Sprintf("</ego::%s>", blk.Name)
+	default:
+		return "<UNKNOWN>"
+	}
+}
+
+// Field represents a key/value pair on a component.
+type Field struct {
+	Name    string
+	NamePos Pos
+
+	Value    string
+	ValuePos Pos
+}
+
+// Position returns the position of the block.
+func Position(blk Block) Pos {
+	switch blk := blk.(type) {
+	case *TextBlock:
+		return blk.Pos
+	case *CodeBlock:
+		return blk.Pos
+	case *PrintBlock:
+		return blk.Pos
+	case *RawPrintBlock:
+		return blk.Pos
+	case *ComponentStartBlock:
+		return blk.Pos
+	case *ComponentEndBlock:
+		return blk.Pos
+	case *AttrStartBlock:
+		return blk.Pos
+	case *AttrEndBlock:
+		return blk.Pos
+	default:
+		panic("unreachable")
+	}
+}
 
 // Pos represents a position in a given file.
 type Pos struct {
@@ -265,4 +357,9 @@ func stringSliceContains(a []string, v string) bool {
 		}
 	}
 	return false
+}
+
+type stackElem struct {
+	block Block
+	yield []Block
 }
