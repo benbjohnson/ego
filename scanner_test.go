@@ -135,7 +135,7 @@ func TestScanner(t *testing.T) {
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 					t.Fatalf("unexpected block type: %T", blk)
 				} else if len(blk.Fields) != 1 {
-					t.Fatalf("unexpected field count: %d", blk.Name)
+					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 					Name:     "foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -153,7 +153,7 @@ func TestScanner(t *testing.T) {
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 					t.Fatalf("unexpected block type: %T", blk)
 				} else if len(blk.Fields) != 1 {
-					t.Fatalf("unexpected field count: %d", blk.Name)
+					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 					Name:     "foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -171,7 +171,7 @@ func TestScanner(t *testing.T) {
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 					t.Fatalf("unexpected block type: %T", blk)
 				} else if len(blk.Fields) != 1 {
-					t.Fatalf("unexpected field count: %d", blk.Name)
+					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 					Name:     "foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -190,7 +190,7 @@ func TestScanner(t *testing.T) {
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 						t.Fatalf("unexpected block type: %T", blk)
 					} else if len(blk.Fields) != 1 {
-						t.Fatalf("unexpected field count: %d", blk.Name)
+						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 						Name:     "Foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -208,7 +208,7 @@ func TestScanner(t *testing.T) {
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 						t.Fatalf("unexpected block type: %T", blk)
 					} else if len(blk.Fields) != 1 {
-						t.Fatalf("unexpected field count: %d", blk.Name)
+						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 						Name:     "_foo123",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -228,7 +228,7 @@ func TestScanner(t *testing.T) {
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 						t.Fatalf("unexpected block type: %T", blk)
 					} else if len(blk.Fields) != 1 {
-						t.Fatalf("unexpected field count: %d", blk.Name)
+						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 						Name:     "foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -246,7 +246,7 @@ func TestScanner(t *testing.T) {
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 						t.Fatalf("unexpected block type: %T", blk)
 					} else if len(blk.Fields) != 1 {
-						t.Fatalf("unexpected field count: %d", blk.Name)
+						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 						Name:     "foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
@@ -264,7 +264,7 @@ func TestScanner(t *testing.T) {
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 						t.Fatalf("unexpected block type: %T", blk)
 					} else if len(blk.Fields) != 1 {
-						t.Fatalf("unexpected field count: %d", blk.Name)
+						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
 						Name:     "foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
