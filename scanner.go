@@ -1,21 +1,31 @@
 package ego
 
 import (
-	"bufio"
 	"bytes"
+	"fmt"
+	"go/parser"
 	"io"
+	"io/ioutil"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Scanner is a tokenizer for ego templates.
 type Scanner struct {
-	r   *bufio.Reader
+	// Reader is held until first read.
+	r io.Reader
+
+	// Entire reader is read into a buffer.
+	b []byte
+	i int
+
 	pos Pos
 }
 
 // NewScanner initializes a new scanner with a given reader.
 func NewScanner(r io.Reader, path string) *Scanner {
 	return &Scanner{
-		r: bufio.NewReader(r),
+		r: r,
 		pos: Pos{
 			Path:   path,
 			LineNo: 1,
@@ -25,102 +35,190 @@ func NewScanner(r io.Reader, path string) *Scanner {
 
 // Scan returns the next block from the reader.
 func (s *Scanner) Scan() (Block, error) {
-	ch, err := s.read()
-	if err != nil {
+	if err := s.init(); err != nil {
 		return nil, err
 	}
 
-	if ch == '<' {
-		return s.scanBlock()
+	switch s.peekN(7) {
+	case "</ego::":
+		return s.scanAttrEndBlock()
 	}
-	return s.scanTextBlock(string(ch))
-}
 
-func (s *Scanner) scanBlock() (Block, error) {
-	ch, err := s.read()
-	if err == io.EOF {
-		return &TextBlock{Content: "<", Pos: s.pos}, nil
-	} else if err != nil {
-		return nil, err
-	} else if ch == '%' {
+	switch s.peekN(6) {
+	case "<ego::":
+		return s.scanAttrStartBlock()
+	case "</ego:":
+		return s.scanComponentEndBlock()
+	}
+
+	switch s.peekN(5) {
+	case "<ego:":
+		return s.scanComponentStartBlock()
+	}
+
+	switch s.peekN(4) {
+	case "<%==":
+		return s.scanRawPrintBlock()
+	}
+
+	switch s.peekN(3) {
+	case "<%=":
+		return s.scanPrintBlock()
+	}
+
+	switch s.peekN(2) {
+	case "<%":
 		return s.scanCodeBlock()
 	}
-	return s.scanTextBlock(string('<') + string(ch))
+
+	if s.peek() == eof {
+		return nil, io.EOF
+	}
+	return s.scanTextBlock()
 }
 
-func (s *Scanner) scanCodeBlock() (Block, error) {
-	ch, err := s.read()
-	if err == io.EOF {
-		return nil, io.ErrUnexpectedEOF
-	} else if err != nil {
-		return nil, err
-	}
-
-	// Check the next character to see if it's a special type of block.
-	switch ch {
-	case '=':
-		ch, err := s.read()
-		if err == io.EOF {
-			return nil, io.ErrUnexpectedEOF
-		} else if err != nil {
-			return nil, err
-		}
-		if ch == '=' {
-			return s.scanRawPrintBlock()
-		} else {
-			s.unread()
-			return s.scanPrintBlock()
-		}
-	}
-
-	// Otherwise read the contents of the code block.
-	s.unread()
-	b := &CodeBlock{Pos: s.pos}
-	content, err := s.scanContent()
-	if err != nil {
-		return nil, err
-	}
-	b.Content = content
-
-	return b, nil
-}
-
-func (s *Scanner) scanRawPrintBlock() (Block, error) {
-	b := &RawPrintBlock{Pos: s.pos}
-	content, err := s.scanContent()
-	if err != nil {
-		return nil, err
-	}
-	b.Content = content
-	return b, nil
-}
-
-func (s *Scanner) scanPrintBlock() (Block, error) {
-	b := &PrintBlock{Pos: s.pos}
-	content, err := s.scanContent()
-	if err != nil {
-		return nil, err
-	}
-	b.Content = content
-	return b, nil
-}
-
-func (s *Scanner) scanTextBlock(prefix string) (Block, error) {
-	buf := bytes.NewBufferString(prefix)
+func (s *Scanner) scanTextBlock() (*TextBlock, error) {
+	buf := bytes.NewBufferString(s.readN(1))
 	b := &TextBlock{Pos: s.pos}
 
 	for {
-		ch, err := s.read()
-		if err == io.EOF {
-			break
-		} else if ch == '<' {
-			s.unread()
+		if ch := s.peek(); ch == eof || ch == '<' {
 			break
 		}
-		buf.WriteRune(ch)
+		buf.WriteRune(s.read())
 	}
 
 	b.Content = string(buf.Bytes())
+
+	return b, nil
+}
+
+func (s *Scanner) scanCodeBlock() (*CodeBlock, error) {
+	b := &CodeBlock{Pos: s.pos}
+	assert(s.readN(2) == "<%")
+
+	content, err := s.scanContent()
+	if err != nil {
+		return nil, err
+	}
+	b.Content = content
+
+	return b, nil
+}
+
+func (s *Scanner) scanPrintBlock() (*PrintBlock, error) {
+	b := &PrintBlock{Pos: s.pos}
+	assert(s.readN(3) == "<%=")
+
+	content, err := s.scanContent()
+	if err != nil {
+		return nil, err
+	}
+	b.Content = content
+	return b, nil
+}
+
+func (s *Scanner) scanRawPrintBlock() (*RawPrintBlock, error) {
+	b := &RawPrintBlock{Pos: s.pos}
+	assert(s.readN(4) == "<%==")
+
+	content, err := s.scanContent()
+	if err != nil {
+		return nil, err
+	}
+	b.Content = content
+	return b, nil
+}
+
+func (s *Scanner) scanComponentStartBlock() (*ComponentStartBlock, error) {
+	b := &ComponentStartBlock{Pos: s.pos}
+	assert(s.readN(5) == "<ego:")
+
+	// Scan name.
+	name, err := s.scanComponentName()
+	if err != nil {
+		return nil, err
+	}
+	b.Name = name
+
+	// Scan fields.
+	for {
+		s.skipWhitespace()
+		if ch := s.peek(); ch == '>' {
+			s.read()
+			break
+		} else if str := s.peekN(2); str == "/>" {
+			s.readN(2)
+			b.Closed = true
+			break
+		}
+
+		field, err := s.scanField()
+		if err != nil {
+			return nil, err
+		}
+		b.Fields = append(b.Fields, field)
+	}
+
+	return b, nil
+}
+
+func (s *Scanner) scanComponentEndBlock() (*ComponentEndBlock, error) {
+	b := &ComponentEndBlock{Pos: s.pos}
+	assert(s.readN(6) == "</ego:")
+
+	// Scan name.
+	name, err := s.scanComponentName()
+	if err != nil {
+		return nil, err
+	}
+	b.Name = name
+	s.skipWhitespace()
+
+	// Scan close.
+	if ch := s.read(); ch != '>' {
+		return nil, NewSyntaxError(s.pos, "Expected '>', found %s", runeString(ch))
+	}
+
+	return b, nil
+}
+
+func (s *Scanner) scanAttrStartBlock() (*AttrStartBlock, error) {
+	b := &AttrStartBlock{Pos: s.pos}
+	assert(s.readN(6) == "<ego::")
+
+	// Scan name.
+	name, err := s.scanIdent()
+	if err != nil {
+		return nil, err
+	}
+	b.Name = name
+	s.skipWhitespace()
+
+	// Scan close.
+	if ch := s.read(); ch != '>' {
+		return nil, NewSyntaxError(s.pos, "Expected '>', found %s", runeString(ch))
+	}
+
+	return b, nil
+}
+
+func (s *Scanner) scanAttrEndBlock() (*AttrEndBlock, error) {
+	b := &AttrEndBlock{Pos: s.pos}
+	assert(s.readN(7) == "</ego::")
+
+	// Scan name.
+	name, err := s.scanIdent()
+	if err != nil {
+		return nil, err
+	}
+	b.Name = name
+	s.skipWhitespace()
+
+	// Scan close.
+	if ch := s.read(); ch != '>' {
+		return nil, NewSyntaxError(s.pos, "Expected '>', found %s", runeString(ch))
+	}
 
 	return b, nil
 }
@@ -129,13 +227,13 @@ func (s *Scanner) scanTextBlock(prefix string) (Block, error) {
 func (s *Scanner) scanContent() (string, error) {
 	var buf bytes.Buffer
 	for {
-		ch, err := s.read()
-		if err == io.EOF {
-			return "", io.ErrUnexpectedEOF
+		ch := s.read()
+		if ch == eof {
+			return "", &SyntaxError{Message: "Expected close tag, found EOF", Pos: s.pos}
 		} else if ch == '%' {
-			ch, err := s.read()
-			if err == io.EOF {
-				return "", io.ErrUnexpectedEOF
+			ch := s.read()
+			if ch == eof {
+				return "", &SyntaxError{Message: "Expected close tag, found EOF", Pos: s.pos}
 			} else if ch == '>' {
 				break
 			} else {
@@ -149,14 +247,267 @@ func (s *Scanner) scanContent() (string, error) {
 	return string(buf.Bytes()), nil
 }
 
-func (s *Scanner) read() (rune, error) {
-	ch, _, err := s.r.ReadRune()
+func (s *Scanner) scanComponentName() (string, error) {
+	s.skipWhitespace()
+
+	// First ident can be a type name or a package name.
+	ident0, err := s.scanIdent()
+	if err != nil {
+		return "", err
+	}
+
+	s.skipWhitespace()
+
+	// If a dot exists, treat as "PKG.TYPE".
+	if s.peek() != '.' {
+		return ident0, nil
+	}
+	assert(s.read() == '.')
+
+	s.skipWhitespace()
+
+	// Second ident must be the type name.
+	ident1, err := s.scanIdent()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s.%s", ident0, ident1), nil
+}
+
+func (s *Scanner) scanField() (*Field, error) {
+	s.skipWhitespace()
+
+	// First ident can be a type name or a package name.
+	namePos := s.pos
+	name, err := s.scanIdent()
+	if err != nil {
+		return nil, err
+	}
+	s.skipWhitespace()
+
+	// If we see an identifier or tag close then assume this is a boolean true.
+	if ch := s.peek(); ch == '>' || isIdentStart(ch) {
+		return &Field{Name: name, NamePos: namePos, Value: "true"}, nil
+	} else if ch := s.peekN(2); ch == "/>" {
+		return &Field{Name: name, NamePos: namePos, Value: "true"}, nil
+	}
+
+	// Expect an equals sign next.
+	if ch := s.read(); ch != '=' {
+		return nil, NewSyntaxError(s.pos, "Expected '=', found %s", runeString(ch))
+	}
+	s.skipWhitespace()
+
+	// Parse expression.
+	valuePos := s.pos
+	value, err := s.scanExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Field{
+		Name:     name,
+		NamePos:  namePos,
+		Value:    value,
+		ValuePos: valuePos,
+	}, nil
+}
+
+func (s *Scanner) scanIdent() (string, error) {
+	var buf bytes.Buffer
+
+	// First rune must be a letter.
+	ch := s.read()
+	if !isIdentStart(ch) {
+		return "", NewSyntaxError(s.pos, "Expected identifier, found %s", runeString(ch))
+	}
+	buf.WriteRune(ch)
+
+	// Keep scanning while we have letters or digits.
+	for ch := s.peek(); unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_'; ch = s.peek() {
+		buf.WriteRune(s.read())
+	}
+
+	return buf.String(), nil
+}
+
+func (s *Scanner) scanExpr() (string, error) {
+	var buf bytes.Buffer
+	pos := s.pos
+
+	if ch := s.peek(); ch == eof {
+		return "", NewSyntaxError(pos, "Expected Go expression, found EOF")
+	}
+	buf.WriteRune(s.read())
+
+	for ch := s.peek(); ; ch = s.peek() {
+		// A struct with a space between the identifier and open brace can be
+		// a false positive so handle that special case.
+		if isWhitespace(ch) && s.peekIgnoreWhitespace() == '{' {
+			buf.WriteString(s.scanWhitespace())
+			buf.WriteRune(s.read())
+			continue
+		}
+
+		// If we hit an expression delimiter then check for expression validity.
+		if isWhitespace(ch) || ch == eof || ch == '>' || s.peekN(2) == "/>" {
+			if _, err := parser.ParseExpr(buf.String()); err != nil && ch == eof {
+				return "", NewSyntaxError(pos, "Incomplete Go expression before EOF")
+			} else if err == nil {
+				break
+			}
+		}
+
+		// Append to buffer.
+		buf.WriteRune(s.read())
+	}
+
+	return buf.String(), nil
+}
+
+func (s *Scanner) scanWhitespace() string {
+	var buf bytes.Buffer
+	for ch := s.peek(); isWhitespace(ch); ch = s.peek() {
+		buf.WriteRune(s.read())
+	}
+	return buf.String()
+}
+
+// init slurps the reader on first scan.
+func (s *Scanner) init() (err error) {
+	if s.b != nil {
+		return nil
+	}
+	s.b, err = ioutil.ReadAll(s.r)
+	return err
+}
+
+// read reads the next rune and moves the position forward.
+func (s *Scanner) read() rune {
+	if s.i >= len(s.b) {
+		return eof
+	}
+
+	ch, n := utf8.DecodeRune(s.b[s.i:])
+	s.i += n
+
 	if ch == '\n' {
 		s.pos.LineNo++
 	}
-	return ch, err
+	return ch
 }
 
-func (s *Scanner) unread() {
-	s.r.UnreadRune()
+// readN reads the next n characters and moves the position forward.
+func (s *Scanner) readN(n int) string {
+	var buf bytes.Buffer
+	for i := 0; i < n; i++ {
+		ch := s.read()
+		if ch == eof {
+			break
+		}
+		buf.WriteRune(ch)
+	}
+	return buf.String()
+}
+
+// peek reads the next rune but does not move the position forward.
+func (s *Scanner) peek() rune {
+	if s.i >= len(s.b) {
+		return eof
+	}
+	ch, _ := utf8.DecodeRune(s.b[s.i:])
+	return ch
+}
+
+// peekN reads the next n runes but does not move the position forward.
+func (s *Scanner) peekN(n int) string {
+	if s.i >= len(s.b) {
+		return ""
+	}
+	b := s.b[s.i:]
+
+	var buf bytes.Buffer
+	for i := 0; i < n && len(b) > 0; i++ {
+		ch, sz := utf8.DecodeRune(b)
+		b = b[sz:]
+		buf.WriteRune(ch)
+	}
+	return buf.String()
+}
+
+// peekIgnoreWhitespace reads the non-whitespace rune.
+func (s *Scanner) peekIgnoreWhitespace() rune {
+	var b []byte
+	if s.i < len(s.b) {
+		b = s.b[s.i:]
+	}
+
+	for i := 0; ; i++ {
+		if len(b) == 0 {
+			return eof
+		}
+
+		ch, sz := utf8.DecodeRune(b)
+		if !isWhitespace(ch) {
+			return ch
+		}
+
+		b = b[sz:]
+	}
+}
+
+func (s *Scanner) skipWhitespace() {
+	for ch := s.peek(); isWhitespace(ch); ch = s.peek() {
+		s.read()
+	}
+	return
+}
+
+const eof = rune(0)
+
+type SyntaxError struct {
+	Message string
+	Pos     Pos
+}
+
+func NewSyntaxError(pos Pos, format string, args ...interface{}) *SyntaxError {
+	return &SyntaxError{
+		Message: fmt.Sprintf(format, args...),
+		Pos:     pos,
+	}
+}
+
+func (e *SyntaxError) Error() string {
+	return fmt.Sprintf("%s at %s:%d", e.Message, e.Pos.Path, e.Pos.LineNo)
+}
+
+func isIdentStart(ch rune) bool {
+	return unicode.IsLetter(ch) || ch == '_'
+}
+
+func isWhitespace(ch rune) bool {
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
+}
+
+func runeString(ch rune) string {
+	switch ch {
+	case eof:
+		return "EOF"
+	case ' ':
+		return "<space>"
+	case '\t':
+		return `\t`
+	case '\n':
+		return `\n`
+	case '\r':
+		return `\r`
+	default:
+		return string(ch)
+	}
+}
+
+func assert(condition bool) {
+	if !condition {
+		panic("assertion failed")
+	}
 }
