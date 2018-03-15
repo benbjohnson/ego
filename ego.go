@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"io"
 	"strings"
-	"unicode"
 )
 
 // Template represents an entire Ego template.
@@ -75,7 +74,11 @@ func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
 			fmt.Fprintf(buf, `_, _ = fmt.Fprint(w, %s)`+"\n", blk.Content)
 
 		case *ComponentStartBlock:
-			fmt.Fprintf(buf, "{ egoComponent := %s{\n", blk.Name)
+			if blk.Package != "" {
+				fmt.Fprintf(buf, "{\negoComponent := %s.%s{\n", blk.Package, blk.Name)
+			} else {
+				fmt.Fprintf(buf, "{\negoComponent := %s{\n", blk.Name)
+			}
 
 			for _, field := range blk.Fields {
 				fmt.Fprintf(buf, "%s: %s,\n", field.Name, field.Value)
@@ -107,20 +110,8 @@ func normalizeBlocks(a []Block) []Block {
 
 func joinAdjacentTextBlocks(a []Block) []Block {
 	var other []Block
-	var hasTextBlock bool
 	for _, blk := range a {
 		curr, isTextBlock := blk.(*TextBlock)
-
-		// Trim left space from the first text block. Discard empty blocks.
-		if isTextBlock {
-			if !hasTextBlock {
-				curr.Content = strings.TrimLeftFunc(curr.Content, unicode.IsSpace)
-			}
-			if curr.Content == "" {
-				continue
-			}
-			hasTextBlock = true
-		}
 
 		// Always append the first block.
 		if len(other) == 0 {
@@ -269,43 +260,79 @@ type RawPrintBlock struct {
 
 // ComponentStartBlock represents the opening block of an ego component.
 type ComponentStartBlock struct {
-	Pos    Pos
-	Name   string
-	Closed bool
-	Fields []*Field
-	Attrs  []*AttrStartBlock
-	Yield  []Block
+	Pos     Pos
+	Package string
+	Name    string
+	Closed  bool
+	Fields  []*Field
+	Attrs   []*AttrStartBlock
+	Yield   []Block
+}
+
+// Namespace returns the block package, if defined. Otherwise returns "ego".
+func (blk *ComponentStartBlock) Namespace() string {
+	if blk.Package == "" {
+		return "ego"
+	}
+	return blk.Package
 }
 
 // ComponentEndBlock represents the closing block of an ego component.
 type ComponentEndBlock struct {
-	Pos  Pos
-	Name string
+	Pos     Pos
+	Package string
+	Name    string
+}
+
+// Namespace returns the block package, if defined. Otherwise returns "ego".
+func (blk *ComponentEndBlock) Namespace() string {
+	if blk.Package == "" {
+		return "ego"
+	}
+	return blk.Package
 }
 
 // AttrStartBlock represents the opening block of an ego component attribute.
 type AttrStartBlock struct {
-	Pos   Pos
-	Name  string
-	Yield []Block
+	Pos     Pos
+	Package string
+	Name    string
+	Yield   []Block
+}
+
+// Namespace returns the block package, if defined. Otherwise returns "ego".
+func (blk *AttrStartBlock) Namespace() string {
+	if blk.Package == "" {
+		return "ego"
+	}
+	return blk.Package
 }
 
 // AttrEndBlock represents the closing block of an ego component attribute.
 type AttrEndBlock struct {
-	Pos  Pos
-	Name string
+	Pos     Pos
+	Package string
+	Name    string
+}
+
+// Namespace returns the block package, if defined. Otherwise returns "ego".
+func (blk *AttrEndBlock) Namespace() string {
+	if blk.Package == "" {
+		return "ego"
+	}
+	return blk.Package
 }
 
 func shortComponentBlockString(blk Block) string {
 	switch blk := blk.(type) {
 	case *ComponentStartBlock:
-		return fmt.Sprintf("<ego:%s>", blk.Name)
+		return fmt.Sprintf("<%s:%s>", blk.Namespace(), blk.Name)
 	case *ComponentEndBlock:
-		return fmt.Sprintf("</ego:%s>", blk.Name)
+		return fmt.Sprintf("</%s:%s>", blk.Namespace(), blk.Name)
 	case *AttrStartBlock:
-		return fmt.Sprintf("<ego::%s>", blk.Name)
+		return fmt.Sprintf("<%s::%s>", blk.Namespace(), blk.Name)
 	case *AttrEndBlock:
-		return fmt.Sprintf("</ego::%s>", blk.Name)
+		return fmt.Sprintf("</%s::%s>", blk.Namespace(), blk.Name)
 	default:
 		return "<UNKNOWN>"
 	}
