@@ -75,28 +75,28 @@ func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
 
 		case *ComponentStartBlock:
 			if blk.Package != "" {
-				fmt.Fprintf(buf, "{\negoComponent := %s.%s{\n", blk.Package, blk.Name)
+				fmt.Fprintf(buf, "{\nvar EGO %s.%s\n", blk.Package, blk.Name)
 			} else {
-				fmt.Fprintf(buf, "{\negoComponent := %s{\n", blk.Name)
+				fmt.Fprintf(buf, "{\nvar EGO %s\n", blk.Name)
 			}
 
 			for _, field := range blk.Fields {
-				fmt.Fprintf(buf, "%s: %s,\n", field.Name, field.Value)
+				fmt.Fprintf(buf, "EGO.%s = %s\n", field.Name, field.Value)
 			}
 
 			for _, attr := range blk.Attrs {
-				fmt.Fprintf(buf, "%s: func() {\n", attr.Name)
+				fmt.Fprintf(buf, "EGO.%s = func() {\n", attr.Name)
 				writeBlocksTo(buf, attr.Yield)
-				fmt.Fprint(buf, "},\n")
+				fmt.Fprint(buf, "}\n")
 			}
 
 			if len(blk.Yield) > 0 {
-				buf.WriteString("Yield: func() {\n")
+				buf.WriteString("EGO.Yield = func() {\n")
 				writeBlocksTo(buf, blk.Yield)
-				buf.WriteString("},\n")
+				buf.WriteString("}\n")
 			}
 
-			fmt.Fprint(buf, "}\negoComponent.Render(ctx, w) }\n")
+			fmt.Fprint(buf, "EGO.Render(ctx, w) }\n")
 		}
 	}
 }
