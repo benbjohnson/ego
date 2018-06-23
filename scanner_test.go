@@ -107,6 +107,8 @@ func TestScanner(t *testing.T) {
 				t.Fatal(err)
 			} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Package != "" {
+				t.Fatalf("unexpected package: %s", blk.Package)
 			} else if blk.Name != "MyComponent123" {
 				t.Fatalf("unexpected name: %s", blk.Name)
 			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
@@ -115,12 +117,14 @@ func TestScanner(t *testing.T) {
 		})
 
 		t.Run("PkgAndType", func(t *testing.T) {
-			s := ego.NewScanner(bytes.NewBufferString(`<ego:util.myComponent123 >`), "tmpl.ego")
+			s := ego.NewScanner(bytes.NewBufferString(`<util:myComponent123 >`), "tmpl.ego")
 			if blk, err := s.Scan(); err != nil {
 				t.Fatal(err)
 			} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
 				t.Fatalf("unexpected block type: %T", blk)
-			} else if blk.Name != "util.myComponent123" {
+			} else if blk.Package != "util" {
+				t.Fatalf("unexpected package: %s", blk.Package)
+			} else if blk.Name != "myComponent123" {
 				t.Fatalf("unexpected name: %s", blk.Name)
 			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
 				t.Fatalf("unexpected pos: %#v", blk.Pos)
@@ -286,6 +290,8 @@ func TestScanner(t *testing.T) {
 				t.Fatal(err)
 			} else if blk, ok := blk.(*ego.ComponentEndBlock); !ok {
 				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Package != "" {
+				t.Fatalf("unexpected package: %s", blk.Package)
 			} else if blk.Name != "MyComponent123" {
 				t.Fatalf("unexpected name: %s", blk.Name)
 			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
@@ -294,12 +300,14 @@ func TestScanner(t *testing.T) {
 		})
 
 		t.Run("PkgAndType", func(t *testing.T) {
-			s := ego.NewScanner(bytes.NewBufferString(`</ego:util.myComponent123 >`), "tmpl.ego")
+			s := ego.NewScanner(bytes.NewBufferString(`</util:myComponent123 >`), "tmpl.ego")
 			if blk, err := s.Scan(); err != nil {
 				t.Fatal(err)
 			} else if blk, ok := blk.(*ego.ComponentEndBlock); !ok {
 				t.Fatalf("unexpected block type: %T", blk)
-			} else if blk.Name != "util.myComponent123" {
+			} else if blk.Package != "util" {
+				t.Fatalf("unexpected package: %s", blk.Package)
+			} else if blk.Name != "myComponent123" {
 				t.Fatalf("unexpected name: %s", blk.Name)
 			} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
 				t.Fatalf("unexpected pos: %#v", blk.Pos)
@@ -313,6 +321,8 @@ func TestScanner(t *testing.T) {
 			t.Fatal(err)
 		} else if blk, ok := blk.(*ego.AttrStartBlock); !ok {
 			t.Fatalf("unexpected block type: %T", blk)
+		} else if blk.Package != "" {
+			t.Fatalf("unexpected package: %s", blk.Package)
 		} else if blk.Name != "MyField123" {
 			t.Fatalf("unexpected name: %s", blk.Name)
 		} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {
@@ -326,6 +336,8 @@ func TestScanner(t *testing.T) {
 			t.Fatal(err)
 		} else if blk, ok := blk.(*ego.AttrEndBlock); !ok {
 			t.Fatalf("unexpected block type: %T", blk)
+		} else if blk.Package != "" {
+			t.Fatalf("unexpected package: %s", blk.Package)
 		} else if blk.Name != "_myField123" {
 			t.Fatalf("unexpected name: %s", blk.Name)
 		} else if !reflect.DeepEqual(blk.Pos, ego.Pos{Path: "tmpl.ego", LineNo: 1}) {

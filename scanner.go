@@ -39,39 +39,29 @@ func (s *Scanner) Scan() (Block, error) {
 		return nil, err
 	}
 
-	switch s.peekN(7) {
-	case "</ego::":
-		return s.scanAttrEndBlock()
-	}
+	switch s.peek() {
+	case '<':
+		// Special handling for component/attr blocks.
+		if s.peekComponentStartBlock() {
+			return s.scanComponentStartBlock()
+		} else if s.peekComponentEndBlock() {
+			return s.scanComponentEndBlock()
+		} else if s.peekAttrStartBlock() {
+			return s.scanAttrStartBlock()
+		} else if s.peekAttrEndBlock() {
+			return s.scanAttrEndBlock()
+		}
 
-	switch s.peekN(6) {
-	case "<ego::":
-		return s.scanAttrStartBlock()
-	case "</ego:":
-		return s.scanComponentEndBlock()
-	}
+		// Special handling for ego blocks.
+		if s.peekN(4) == "<%==" {
+			return s.scanRawPrintBlock()
+		} else if s.peekN(3) == "<%=" {
+			return s.scanPrintBlock()
+		} else if s.peekN(2) == "<%" {
+			return s.scanCodeBlock()
+		}
 
-	switch s.peekN(5) {
-	case "<ego:":
-		return s.scanComponentStartBlock()
-	}
-
-	switch s.peekN(4) {
-	case "<%==":
-		return s.scanRawPrintBlock()
-	}
-
-	switch s.peekN(3) {
-	case "<%=":
-		return s.scanPrintBlock()
-	}
-
-	switch s.peekN(2) {
-	case "<%":
-		return s.scanCodeBlock()
-	}
-
-	if s.peek() == eof {
+	case eof:
 		return nil, io.EOF
 	}
 	return s.scanTextBlock()
@@ -130,16 +120,40 @@ func (s *Scanner) scanRawPrintBlock() (*RawPrintBlock, error) {
 	return b, nil
 }
 
-func (s *Scanner) scanComponentStartBlock() (*ComponentStartBlock, error) {
-	b := &ComponentStartBlock{Pos: s.pos}
-	assert(s.readN(5) == "<ego:")
+func (s *Scanner) peekComponentStartBlock() bool {
+	pos, i := s.pos, s.i
+	defer func() { s.pos, s.i = pos, i }()
 
-	// Scan name.
-	name, err := s.scanComponentName()
-	if err != nil {
+	if s.read() != '<' {
+		return false
+	} else if !s.peekIdent() {
+		return false
+	} else if s.read() != ':' {
+		return false
+	} else if s.read() == ':' {
+		return false // attr end block
+	}
+	return true
+}
+
+func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) {
+	b := &ComponentStartBlock{Pos: s.pos}
+	assert(s.read() == '<')
+
+	// Scan package name. The ego package is reserved for local types.
+	if b.Package, err = s.scanIdent(); err != nil {
+		return nil, err
+	} else if b.Package == "ego" {
+		b.Package = ""
+	}
+
+	// Read separator.
+	assert(s.read() == ':')
+
+	// Scan type name.
+	if b.Name, err = s.scanIdent(); err != nil {
 		return nil, err
 	}
-	b.Name = name
 
 	// Scan fields.
 	for {
@@ -163,16 +177,42 @@ func (s *Scanner) scanComponentStartBlock() (*ComponentStartBlock, error) {
 	return b, nil
 }
 
-func (s *Scanner) scanComponentEndBlock() (*ComponentEndBlock, error) {
+func (s *Scanner) peekComponentEndBlock() bool {
+	pos, i := s.pos, s.i
+	defer func() { s.pos, s.i = pos, i }()
+
+	if s.read() != '<' {
+		return false
+	} else if s.read() != '/' {
+		return false
+	} else if !s.peekIdent() {
+		return false
+	} else if s.read() != ':' {
+		return false
+	} else if s.read() == ':' {
+		return false // attr end block
+	}
+	return true
+}
+
+func (s *Scanner) scanComponentEndBlock() (_ *ComponentEndBlock, err error) {
 	b := &ComponentEndBlock{Pos: s.pos}
-	assert(s.readN(6) == "</ego:")
+	assert(s.readN(2) == "</")
+
+	// Scan package name.
+	if b.Package, err = s.scanIdent(); err != nil {
+		return nil, err
+	} else if b.Package == "ego" {
+		b.Package = ""
+	}
+
+	// Read separator.
+	assert(s.read() == ':')
 
 	// Scan name.
-	name, err := s.scanComponentName()
-	if err != nil {
+	if b.Name, err = s.scanIdent(); err != nil {
 		return nil, err
 	}
-	b.Name = name
 	s.skipWhitespace()
 
 	// Scan close.
@@ -183,16 +223,41 @@ func (s *Scanner) scanComponentEndBlock() (*ComponentEndBlock, error) {
 	return b, nil
 }
 
-func (s *Scanner) scanAttrStartBlock() (*AttrStartBlock, error) {
+func (s *Scanner) peekAttrStartBlock() bool {
+	pos, i := s.pos, s.i
+	defer func() { s.pos, s.i = pos, i }()
+
+	if s.read() != '<' {
+		return false
+	} else if !s.peekIdent() {
+		return false
+	} else if s.read() != ':' {
+		return false
+	} else if s.read() != ':' {
+		return false // component end block
+	}
+	return true
+}
+
+func (s *Scanner) scanAttrStartBlock() (_ *AttrStartBlock, err error) {
 	b := &AttrStartBlock{Pos: s.pos}
-	assert(s.readN(6) == "<ego::")
+	assert(s.read() == '<')
+
+	// Scan package name.
+	if b.Package, err = s.scanIdent(); err != nil {
+		return nil, err
+	} else if b.Package == "ego" {
+		b.Package = ""
+	}
+
+	// Read separator.
+	assert(s.read() == ':')
+	assert(s.read() == ':')
 
 	// Scan name.
-	name, err := s.scanIdent()
-	if err != nil {
+	if b.Name, err = s.scanIdent(); err != nil {
 		return nil, err
 	}
-	b.Name = name
 	s.skipWhitespace()
 
 	// Scan close.
@@ -203,16 +268,43 @@ func (s *Scanner) scanAttrStartBlock() (*AttrStartBlock, error) {
 	return b, nil
 }
 
-func (s *Scanner) scanAttrEndBlock() (*AttrEndBlock, error) {
+func (s *Scanner) peekAttrEndBlock() bool {
+	pos, i := s.pos, s.i
+	defer func() { s.pos, s.i = pos, i }()
+
+	if s.read() != '<' {
+		return false
+	} else if s.read() != '/' {
+		return false
+	} else if !s.peekIdent() {
+		return false
+	} else if s.read() != ':' {
+		return false
+	} else if s.read() != ':' {
+		return false // component end block
+	}
+	return true
+}
+
+func (s *Scanner) scanAttrEndBlock() (_ *AttrEndBlock, err error) {
 	b := &AttrEndBlock{Pos: s.pos}
-	assert(s.readN(7) == "</ego::")
+	assert(s.readN(2) == "</")
+
+	// Scan package name.
+	if b.Package, err = s.scanIdent(); err != nil {
+		return nil, err
+	} else if b.Package == "ego" {
+		b.Package = ""
+	}
+
+	// Read separator.
+	assert(s.read() == ':')
+	assert(s.read() == ':')
 
 	// Scan name.
-	name, err := s.scanIdent()
-	if err != nil {
+	if b.Name, err = s.scanIdent(); err != nil {
 		return nil, err
 	}
-	b.Name = name
 	s.skipWhitespace()
 
 	// Scan close.
@@ -245,33 +337,6 @@ func (s *Scanner) scanContent() (string, error) {
 		}
 	}
 	return string(buf.Bytes()), nil
-}
-
-func (s *Scanner) scanComponentName() (string, error) {
-	s.skipWhitespace()
-
-	// First ident can be a type name or a package name.
-	ident0, err := s.scanIdent()
-	if err != nil {
-		return "", err
-	}
-
-	s.skipWhitespace()
-
-	// If a dot exists, treat as "PKG.TYPE".
-	if s.peek() != '.' {
-		return ident0, nil
-	}
-	assert(s.read() == '.')
-
-	s.skipWhitespace()
-
-	// Second ident must be the type name.
-	ident1, err := s.scanIdent()
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s.%s", ident0, ident1), nil
 }
 
 func (s *Scanner) scanField() (*Field, error) {
@@ -311,6 +376,11 @@ func (s *Scanner) scanField() (*Field, error) {
 		Value:    value,
 		ValuePos: valuePos,
 	}, nil
+}
+
+func (s *Scanner) peekIdent() bool {
+	ident, _ := s.scanIdent()
+	return ident != ""
 }
 
 func (s *Scanner) scanIdent() (string, error) {
