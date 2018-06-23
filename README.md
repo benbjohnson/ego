@@ -1,4 +1,4 @@
-Ego [![Coverage Status](https://coveralls.io/repos/benbjohnson/ego/badge.png?branch=master)](https://coveralls.io/r/benbjohnson/ego?branch=master) [![GoDoc](https://godoc.org/github.com/benbjohnson/ego?status.png)](https://godoc.org/github.com/benbjohnson/ego) ![Project status](http://img.shields.io/status/beta.png?color=blue)
+Ego [![GoDoc](https://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat-square)](https://godoc.org/github.com/benbjohnson/ego)
 ===
 
 Ego is an [ERb](http://ruby-doc.org/stdlib-2.1.0/libdoc/erb/rdoc/ERB.html) style templating language for Go. It works by transpiling templates into pure Go and including them at compile time. These templates are light wrappers around the Go language itself.
