@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"sort"
 	"strings"
 )
 
@@ -84,9 +85,17 @@ func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
 				fmt.Fprintf(buf, "EGO.%s = %s\n", field.Name, field.Value)
 			}
 
-			for _, attr := range blk.Attrs {
-				fmt.Fprintf(buf, "EGO.%s = func() {\n", attr.Name)
-				writeBlocksTo(buf, attr.Yield)
+			if len(blk.Attrs) > 0 {
+				fmt.Fprintf(buf, "EGO.Attrs = map[string]string{\n")
+				for _, attr := range blk.Attrs {
+					fmt.Fprintf(buf, "	%q: fmt.Sprint(%s),\n", attr.Name, attr.Value)
+				}
+				fmt.Fprintf(buf, "}\n")
+			}
+
+			for _, attrBlock := range blk.AttrBlocks {
+				fmt.Fprintf(buf, "EGO.%s = func() {\n", attrBlock.Name)
+				writeBlocksTo(buf, attrBlock.Yield)
 				fmt.Fprint(buf, "}\n")
 			}
 
@@ -260,13 +269,14 @@ type RawPrintBlock struct {
 
 // ComponentStartBlock represents the opening block of an ego component.
 type ComponentStartBlock struct {
-	Pos     Pos
-	Package string
-	Name    string
-	Closed  bool
-	Fields  []*Field
-	Attrs   []*AttrStartBlock
-	Yield   []Block
+	Pos        Pos
+	Package    string
+	Name       string
+	Closed     bool
+	Fields     []*Field
+	Attrs      []*Attr
+	AttrBlocks []*AttrStartBlock
+	Yield      []Block
 }
 
 // Namespace returns the block package, if defined. Otherwise returns "ego".
@@ -347,6 +357,15 @@ type Field struct {
 	ValuePos Pos
 }
 
+// Attr represents a key/value passthrough pair on a component.
+type Attr struct {
+	Name    string
+	NamePos Pos
+
+	Value    string
+	ValuePos Pos
+}
+
 // Position returns the position of the block.
 func Position(blk Block) Pos {
 	switch blk := blk.(type) {
@@ -389,4 +408,14 @@ func stringSliceContains(a []string, v string) bool {
 type stackElem struct {
 	block Block
 	yield []Block
+}
+
+// AttrNames returns a sorted list of names for an attribute set.
+func AttrNames(attrs map[string]interface{}) []string {
+	a := make([]string, 0, len(attrs))
+	for k := range attrs {
+		a = append(a, k)
+	}
+	sort.Strings(a)
+	return a
 }

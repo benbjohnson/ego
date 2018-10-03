@@ -155,7 +155,7 @@ func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) 
 		return nil, err
 	}
 
-	// Scan fields.
+	// Scan attributes & fields.
 	for {
 		s.skipWhitespace()
 		if ch := s.peek(); ch == '>' {
@@ -167,11 +167,20 @@ func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) 
 			break
 		}
 
-		field, err := s.scanField()
+		if ch := s.peek(); unicode.IsUpper(ch) {
+			field, err := s.scanField()
+			if err != nil {
+				return nil, err
+			}
+			b.Fields = append(b.Fields, field)
+			continue
+		}
+
+		attr, err := s.scanAttr()
 		if err != nil {
 			return nil, err
 		}
-		b.Fields = append(b.Fields, field)
+		b.Attrs = append(b.Attrs, attr)
 	}
 
 	return b, nil
@@ -378,6 +387,45 @@ func (s *Scanner) scanField() (*Field, error) {
 	}, nil
 }
 
+func (s *Scanner) scanAttr() (*Attr, error) {
+	s.skipWhitespace()
+
+	// First scan is the HTML attribute name.
+	namePos := s.pos
+	name, err := s.scanAttrName()
+	if err != nil {
+		return nil, err
+	}
+	s.skipWhitespace()
+
+	// If we see an identifier or tag close then only save the name.
+	if ch := s.peek(); ch == '>' || isIdentStart(ch) {
+		return &Attr{Name: name, NamePos: namePos}, nil
+	} else if ch := s.peekN(2); ch == "/>" {
+		return &Attr{Name: name, NamePos: namePos}, nil
+	}
+
+	// Expect an equals sign next.
+	if ch := s.read(); ch != '=' {
+		return nil, NewSyntaxError(s.pos, "Expected '=', found %s", runeString(ch))
+	}
+	s.skipWhitespace()
+
+	// Parse expression.
+	valuePos := s.pos
+	value, err := s.scanExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Attr{
+		Name:     name,
+		NamePos:  namePos,
+		Value:    value,
+		ValuePos: valuePos,
+	}, nil
+}
+
 func (s *Scanner) peekIdent() bool {
 	ident, _ := s.scanIdent()
 	return ident != ""
@@ -395,6 +443,24 @@ func (s *Scanner) scanIdent() (string, error) {
 
 	// Keep scanning while we have letters or digits.
 	for ch := s.peek(); unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_'; ch = s.peek() {
+		buf.WriteRune(s.read())
+	}
+
+	return buf.String(), nil
+}
+
+func (s *Scanner) scanAttrName() (string, error) {
+	var buf bytes.Buffer
+
+	// First rune must be a letter.
+	ch := s.read()
+	if !isIdentStart(ch) {
+		return "", NewSyntaxError(s.pos, "Expected identifier, found %s", runeString(ch))
+	}
+	buf.WriteRune(ch)
+
+	// Keep scanning while we have letters or digits.
+	for ch := s.peek(); unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == ':' || ch == '.' || ch == '-'; ch = s.peek() {
 		buf.WriteRune(s.read())
 	}
 

@@ -79,7 +79,7 @@ func parseComponentBlock(s *Scanner, start *ComponentStartBlock) error {
 			if err := parseAttrBlock(s, blk); err != nil {
 				return err
 			}
-			start.Attrs = append(start.Attrs, blk)
+			start.AttrBlocks = append(start.AttrBlocks, blk)
 
 		case *AttrEndBlock:
 			return NewSyntaxError(blk.Pos, "Attribute end block found without start block: %s", shortComponentBlockString(blk))

@@ -133,7 +133,7 @@ func TestScanner(t *testing.T) {
 
 		t.Run("WithField", func(t *testing.T) {
 			t.Run("Int", func(t *testing.T) {
-				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=123>`), "tmpl.ego")
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=123>`), "tmpl.ego")
 				if blk, err := s.Scan(); err != nil {
 					t.Fatal(err)
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -141,7 +141,7 @@ func TestScanner(t *testing.T) {
 				} else if len(blk.Fields) != 1 {
 					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-					Name:     "foo",
+					Name:     "Foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 					Value:    "123",
 					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -151,7 +151,7 @@ func TestScanner(t *testing.T) {
 			})
 
 			t.Run("Float", func(t *testing.T) {
-				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=100.23 >`), "tmpl.ego")
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=100.23 >`), "tmpl.ego")
 				if blk, err := s.Scan(); err != nil {
 					t.Fatal(err)
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -159,7 +159,7 @@ func TestScanner(t *testing.T) {
 				} else if len(blk.Fields) != 1 {
 					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-					Name:     "foo",
+					Name:     "Foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 					Value:    "100.23",
 					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -169,7 +169,7 @@ func TestScanner(t *testing.T) {
 			})
 
 			t.Run("Bool", func(t *testing.T) {
-				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=true>`), "tmpl.ego")
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=true>`), "tmpl.ego")
 				if blk, err := s.Scan(); err != nil {
 					t.Fatal(err)
 				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -177,7 +177,7 @@ func TestScanner(t *testing.T) {
 				} else if len(blk.Fields) != 1 {
 					t.Fatalf("unexpected field count: %d", len(blk.Fields))
 				} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-					Name:     "foo",
+					Name:     "Foo",
 					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 					Value:    "true",
 					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -206,7 +206,7 @@ func TestScanner(t *testing.T) {
 				})
 
 				t.Run("Backtick", func(t *testing.T) {
-					s := ego.NewScanner(bytes.NewBufferString("<ego:Component _foo123=`hello \\t foo!`>"), "tmpl.ego")
+					s := ego.NewScanner(bytes.NewBufferString("<ego:Component Foo123=`hello \\t foo!`>"), "tmpl.ego")
 					if blk, err := s.Scan(); err != nil {
 						t.Fatal(err)
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -214,7 +214,7 @@ func TestScanner(t *testing.T) {
 					} else if len(blk.Fields) != 1 {
 						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-						Name:     "_foo123",
+						Name:     "Foo123",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 						Value:    "`hello \\t foo!`",
 						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -226,7 +226,7 @@ func TestScanner(t *testing.T) {
 
 			t.Run("Struct", func(t *testing.T) {
 				t.Run("Simple", func(t *testing.T) {
-					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=&util.T{X: x, Y: 12}>`), "tmpl.ego")
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=&util.T{X: x, Y: 12}>`), "tmpl.ego")
 					if blk, err := s.Scan(); err != nil {
 						t.Fatal(err)
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -234,7 +234,7 @@ func TestScanner(t *testing.T) {
 					} else if len(blk.Fields) != 1 {
 						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-						Name:     "foo",
+						Name:     "Foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 						Value:    "&util.T{X: x, Y: 12}",
 						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -244,7 +244,7 @@ func TestScanner(t *testing.T) {
 				})
 
 				t.Run("Nested", func(t *testing.T) {
-					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=&util.T{X: x, Y: []V{{Z:"foo"},{Z:"bar"}}}>`), "tmpl.ego")
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=&util.T{X: x, Y: []V{{Z:"foo"},{Z:"bar"}}}>`), "tmpl.ego")
 					if blk, err := s.Scan(); err != nil {
 						t.Fatal(err)
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -252,7 +252,7 @@ func TestScanner(t *testing.T) {
 					} else if len(blk.Fields) != 1 {
 						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-						Name:     "foo",
+						Name:     "Foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 						Value:    `&util.T{X: x, Y: []V{{Z:"foo"},{Z:"bar"}}}`,
 						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -262,7 +262,7 @@ func TestScanner(t *testing.T) {
 				})
 
 				t.Run("AnnoyingSpace", func(t *testing.T) {
-					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=util.T {}>`), "tmpl.ego")
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component Foo=util.T {}>`), "tmpl.ego")
 					if blk, err := s.Scan(); err != nil {
 						t.Fatal(err)
 					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
@@ -270,7 +270,7 @@ func TestScanner(t *testing.T) {
 					} else if len(blk.Fields) != 1 {
 						t.Fatalf("unexpected field count: %d", len(blk.Fields))
 					} else if !reflect.DeepEqual(blk.Fields[0], &ego.Field{
-						Name:     "foo",
+						Name:     "Foo",
 						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
 						Value:    "util.T {}",
 						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
@@ -279,7 +279,188 @@ func TestScanner(t *testing.T) {
 					}
 				})
 			})
+		})
 
+		t.Run("WithAttr", func(t *testing.T) {
+			t.Run("Int", func(t *testing.T) {
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=123>`), "tmpl.ego")
+				if blk, err := s.Scan(); err != nil {
+					t.Fatal(err)
+				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+					t.Fatalf("unexpected block type: %T", blk)
+				} else if len(blk.Attrs) != 1 {
+					t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+				} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+					Name:     "foo",
+					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+					Value:    "123",
+					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+				) {
+					t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+				}
+			})
+
+			t.Run("Float", func(t *testing.T) {
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=100.23 >`), "tmpl.ego")
+				if blk, err := s.Scan(); err != nil {
+					t.Fatal(err)
+				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+					t.Fatalf("unexpected block type: %T", blk)
+				} else if len(blk.Attrs) != 1 {
+					t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+				} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+					Name:     "foo",
+					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+					Value:    "100.23",
+					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+				) {
+					t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+				}
+			})
+
+			t.Run("Bool", func(t *testing.T) {
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=true>`), "tmpl.ego")
+				if blk, err := s.Scan(); err != nil {
+					t.Fatal(err)
+				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+					t.Fatalf("unexpected block type: %T", blk)
+				} else if len(blk.Attrs) != 1 {
+					t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+				} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+					Name:     "foo",
+					NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+					Value:    "true",
+					ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+				) {
+					t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+				}
+			})
+
+			t.Run("Standalone", func(t *testing.T) {
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo>`), "tmpl.ego")
+				if blk, err := s.Scan(); err != nil {
+					t.Fatal(err)
+				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+					t.Fatalf("unexpected block type: %T", blk)
+				} else if len(blk.Attrs) != 1 {
+					t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+				} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+					Name:    "foo",
+					NamePos: ego.Pos{Path: "tmpl.ego", LineNo: 1},
+				}) {
+					t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+				}
+			})
+
+			t.Run("DashedName", func(t *testing.T) {
+				s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo-bar>`), "tmpl.ego")
+				if blk, err := s.Scan(); err != nil {
+					t.Fatal(err)
+				} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+					t.Fatalf("unexpected block type: %T", blk)
+				} else if len(blk.Attrs) != 1 {
+					t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+				} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+					Name:    "foo-bar",
+					NamePos: ego.Pos{Path: "tmpl.ego", LineNo: 1},
+				}) {
+					t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+				}
+			})
+
+			t.Run("String", func(t *testing.T) {
+				t.Run("DoubleQuote", func(t *testing.T) {
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo="hello \t foo!">`), "tmpl.ego")
+					if blk, err := s.Scan(); err != nil {
+						t.Fatal(err)
+					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+						t.Fatalf("unexpected block type: %T", blk)
+					} else if len(blk.Attrs) != 1 {
+						t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+					} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+						Name:     "foo",
+						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+						Value:    `"hello \t foo!"`,
+						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+					) {
+						t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+					}
+				})
+
+				t.Run("Backtick", func(t *testing.T) {
+					s := ego.NewScanner(bytes.NewBufferString("<ego:Component _foo123=`hello \\t foo!`>"), "tmpl.ego")
+					if blk, err := s.Scan(); err != nil {
+						t.Fatal(err)
+					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+						t.Fatalf("unexpected block type: %T", blk)
+					} else if len(blk.Attrs) != 1 {
+						t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+					} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+						Name:     "_foo123",
+						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+						Value:    "`hello \\t foo!`",
+						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+					) {
+						t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+					}
+				})
+			})
+
+			t.Run("Struct", func(t *testing.T) {
+				t.Run("Simple", func(t *testing.T) {
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=&util.T{X: x, Y: 12}>`), "tmpl.ego")
+					if blk, err := s.Scan(); err != nil {
+						t.Fatal(err)
+					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+						t.Fatalf("unexpected block type: %T", blk)
+					} else if len(blk.Attrs) != 1 {
+						t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+					} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+						Name:     "foo",
+						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+						Value:    "&util.T{X: x, Y: 12}",
+						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+					) {
+						t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+					}
+				})
+
+				t.Run("Nested", func(t *testing.T) {
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=&util.T{X: x, Y: []V{{Z:"foo"},{Z:"bar"}}}>`), "tmpl.ego")
+					if blk, err := s.Scan(); err != nil {
+						t.Fatal(err)
+					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+						t.Fatalf("unexpected block type: %T", blk)
+					} else if len(blk.Attrs) != 1 {
+						t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+					} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+						Name:     "foo",
+						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+						Value:    `&util.T{X: x, Y: []V{{Z:"foo"},{Z:"bar"}}}`,
+						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+					) {
+						t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+					}
+				})
+
+				t.Run("AnnoyingSpace", func(t *testing.T) {
+					s := ego.NewScanner(bytes.NewBufferString(`<ego:Component foo=util.T {}>`), "tmpl.ego")
+					if blk, err := s.Scan(); err != nil {
+						t.Fatal(err)
+					} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+						t.Fatalf("unexpected block type: %T", blk)
+					} else if len(blk.Attrs) != 1 {
+						t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+					} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+						Name:     "foo",
+						NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+						Value:    "util.T {}",
+						ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+					) {
+						t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+					}
+				})
+			})
 		})
 	})
 
