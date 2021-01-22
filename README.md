@@ -5,7 +5,7 @@ Ego is an [ERb](http://ruby-doc.org/stdlib-2.1.0/libdoc/erb/rdoc/ERB.html) style
 
 ## Install
 
-You can find release builds of ego for Mac OS & Linux on the [Releases page](https://github.com/benbjohnson/ego/releases).
+You can find a release build of ego for Linux on the [Releases page](https://github.com/benbjohnson/ego/releases).
 
 To install ego from source, you can run this command outside of the `GOPATH`:
 
