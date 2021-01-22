@@ -3,15 +3,20 @@ Ego [![GoDoc](https://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat
 
 Ego is an [ERb](http://ruby-doc.org/stdlib-2.1.0/libdoc/erb/rdoc/ERB.html) style templating language for Go. It works by transpiling templates into pure Go and including them at compile time. These templates are light wrappers around the Go language itself.
 
-## Usage
+## Install
 
-To install ego:
+You can find release builds of ego for Mac OS & Linux on the [Releases page](https://github.com/benbjohnson/ego/releases).
+
+To install ego from source, you can run this command outside of the `GOPATH`:
 
 ```sh
 $ go get github.com/benbjohnson/ego/...
 ```
 
-Then run `ego` on a directory. Recursively traverse the directory structure and generate Go files for all matching `.ego` files.
+
+## Usage
+
+Run `ego` on a directory. Recursively traverse the directory structure and generate Go files for all matching `.ego` files.
 
 ```sh
 $ ego mypkg

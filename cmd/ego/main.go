@@ -12,8 +12,8 @@ import (
 	"github.com/benbjohnson/ego"
 )
 
-// version is set by the makefile during build.
-var version string
+// Version is set by the makefile during build.
+var Version string
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -37,7 +37,7 @@ func run(args []string) error {
 
 	// If the version flag is set then print the version.
 	if *versionFlag {
-		fmt.Printf("ego v%s\n", version)
+		fmt.Printf("ego %s\n", Version)
 		return nil
 	}
 
