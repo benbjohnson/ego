@@ -615,7 +615,6 @@ func (s *Scanner) skipWhitespace() {
 	for ch := s.peek(); isWhitespace(ch); ch = s.peek() {
 		s.read()
 	}
-	return
 }
 
 const eof = rune(0)
