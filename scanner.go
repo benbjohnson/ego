@@ -78,7 +78,7 @@ func (s *Scanner) scanTextBlock() (*TextBlock, error) {
 		buf.WriteRune(s.read())
 	}
 
-	b.Content = string(buf.Bytes())
+	b.Content = buf.String()
 
 	return b, nil
 }
@@ -364,7 +364,7 @@ func (s *Scanner) scanContent() (string, bool, error) {
 			buf.WriteRune(ch)
 		}
 	}
-	return string(buf.Bytes()), trimRight, nil
+	return buf.String(), trimRight, nil
 }
 
 func (s *Scanner) scanField() (*Field, error) {
