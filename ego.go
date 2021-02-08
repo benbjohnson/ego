@@ -115,7 +115,7 @@ func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
 func normalizeBlocks(a []Block) []Block {
 	a = joinAdjacentTextBlocks(a)
 	a = trimLeftRight(a)
-	a = trimTrailingEmptyTextBlocks(a)
+	a = trimEmptyTextBlocks(a)
 	return a
 }
 
@@ -161,16 +161,14 @@ func trimLeftRight(a []Block) []Block {
 	return a
 }
 
-func trimTrailingEmptyTextBlocks(a []Block) []Block {
-	for len(a) > 0 {
-		blk, ok := a[len(a)-1].(*TextBlock)
-		if !ok || strings.TrimSpace(blk.Content) != "" {
-			break
+func trimEmptyTextBlocks(a []Block) []Block {
+	b := make([]Block, 0, len(a))
+	for _, blk := range a {
+		if tb, ok := blk.(*TextBlock); !ok || strings.TrimSpace(tb.Content) != "" {
+			b = append(b, blk)
 		}
-		a[len(a)-1] = nil
-		a = a[:len(a)-1]
 	}
-	return a
+	return b
 }
 
 func injectImports(f *ast.File) {
