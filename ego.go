@@ -440,11 +440,6 @@ func stringSliceContains(a []string, v string) bool {
 	return false
 }
 
-type stackElem struct {
-	block Block
-	yield []Block
-}
-
 // AttrNames returns a sorted list of names for an attribute set.
 func AttrNames(attrs map[string]interface{}) []string {
 	a := make([]string, 0, len(attrs))
