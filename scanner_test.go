@@ -62,6 +62,45 @@ func TestScanner(t *testing.T) {
 			}
 		})
 
+		t.Run("TrimLeft", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<%- x := 1 %>`), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.CodeBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != " x := 1 " {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			} else if !blk.TrimLeft || blk.TrimRight {
+				t.Fatal("expected TrimLeft only")
+			}
+		})
+
+		t.Run("TrimRight", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<% x := 1 -%>`), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.CodeBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != " x := 1 " {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			} else if blk.TrimLeft || !blk.TrimRight {
+				t.Fatal("expected TrimRight only")
+			}
+		})
+
+		t.Run("Trim", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<%- x := 1 -%>`), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.CodeBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if blk.Content != " x := 1 " {
+				t.Fatalf("unexpected content: %s", blk.Content)
+			} else if !blk.TrimLeft || !blk.TrimRight {
+				t.Fatal("expected TrimLeft and TrimRight")
+			}
+		})
+
 		t.Run("UnexpectedEOF/1", func(t *testing.T) {
 			s := ego.NewScanner(bytes.NewBufferString(`<%`), "tmpl.ego")
 			if _, err := s.Scan(); err == nil || err.Error() != `Expected close tag, found EOF at tmpl.ego:1` {

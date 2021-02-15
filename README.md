@@ -152,6 +152,12 @@ The `<%= %>` block will print your text as escaped HTML, however, sometimes you 
 To do this, simply wrap your Go expression with `<%==` and `%>` tags.
 
 
+#### Trim Space
+
+The `<% %>` blocks can be optionally adorned with a `-` on one or both sides to trigger trimming of whitespace on that side.
+For example `<%-= r.Name %>` will trim whitespace before the print block, but not after it.
+
+
 ### Components
 
 Simple code and print tags work well for simple templates but it can be difficult to make reusable functionality.
