@@ -47,33 +47,26 @@ func run(args []string) error {
 		paths = []string{"."}
 	}
 
-	// Find all templates in each directory.
 	for _, path := range paths {
-		fi, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-
-		// Process all ego files in directory.
-		if fi.IsDir() {
-			if err := processDir(path); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// Ignore files without an .ego extension.
-		if filepath.Ext(path) != ".ego" {
-			continue
-		}
-
-		// Process individual file.
-		if err := processFile(path); err != nil {
+		if err := process(path); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func process(path string) error {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	if fi.IsDir() {
+		return processDir(path)
+	} else {
+		return processFile(path)
+	}
 }
 
 func processDir(path string) error {
@@ -82,7 +75,7 @@ func processDir(path string) error {
 		return err
 	}
 	for _, fi := range fis {
-		if err := processFile(filepath.Join(path, fi.Name())); err != nil {
+		if err := process(filepath.Join(path, fi.Name())); err != nil {
 			return err
 		}
 	}
