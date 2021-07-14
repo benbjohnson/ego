@@ -53,11 +53,11 @@ func (s *Scanner) Scan() (Block, error) {
 		}
 
 		// Special handling for ego blocks.
-		if s.peekN(4) == "<%==" || s.peekN(5) == "<%-==" {
+		if s.peekN(4) == "<%==" {
 			return s.scanRawPrintBlock()
-		} else if s.peekN(3) == "<%=" || s.peekN(4) == "<%-=" {
+		} else if s.peekN(3) == "<%=" {
 			return s.scanPrintBlock()
-		} else if s.peekN(2) == "<%" || s.peekN(3) == "<%-" {
+		} else if s.peekN(2) == "<%" {
 			return s.scanCodeBlock()
 		}
 
@@ -78,66 +78,45 @@ func (s *Scanner) scanTextBlock() (*TextBlock, error) {
 		buf.WriteRune(s.read())
 	}
 
-	b.Content = buf.String()
+	b.Content = string(buf.Bytes())
 
 	return b, nil
 }
 
 func (s *Scanner) scanCodeBlock() (*CodeBlock, error) {
 	b := &CodeBlock{Pos: s.pos}
+	assert(s.readN(2) == "<%")
 
-	if s.peekN(3) == "<%-" {
-		assert(s.readN(3) == "<%-")
-		b.TrimLeft = true
-	} else {
-		assert(s.readN(2) == "<%")
-	}
-
-	content, trimRight, err := s.scanContent()
+	content, err := s.scanContent()
 	if err != nil {
 		return nil, err
 	}
 	b.Content = content
-	b.TrimRight = trimRight
 
 	return b, nil
 }
 
 func (s *Scanner) scanPrintBlock() (*PrintBlock, error) {
 	b := &PrintBlock{Pos: s.pos}
+	assert(s.readN(3) == "<%=")
 
-	if s.peekN(3) == "<%-" {
-		assert(s.readN(4) == "<%-=")
-		b.TrimLeft = true
-	} else {
-		assert(s.readN(3) == "<%=")
-	}
-
-	content, trimRight, err := s.scanContent()
+	content, err := s.scanContent()
 	if err != nil {
 		return nil, err
 	}
 	b.Content = content
-	b.TrimRight = trimRight
 	return b, nil
 }
 
 func (s *Scanner) scanRawPrintBlock() (*RawPrintBlock, error) {
 	b := &RawPrintBlock{Pos: s.pos}
+	assert(s.readN(4) == "<%==")
 
-	if s.peekN(3) == "<%-" {
-		assert(s.readN(5) == "<%-==")
-		b.TrimLeft = true
-	} else {
-		assert(s.readN(4) == "<%==")
-	}
-
-	content, trimRight, err := s.scanContent()
+	content, err := s.scanContent()
 	if err != nil {
 		return nil, err
 	}
 	b.Content = content
-	b.TrimRight = trimRight
 	return b, nil
 }
 
@@ -345,26 +324,28 @@ func (s *Scanner) scanAttrEndBlock() (_ *AttrEndBlock, err error) {
 	return b, nil
 }
 
-// scans the reader until %> or -%> is reached.
-func (s *Scanner) scanContent() (string, bool, error) {
+// scans the reader until %> is reached.
+func (s *Scanner) scanContent() (string, error) {
 	var buf bytes.Buffer
-	var trimRight bool
 	for {
 		ch := s.read()
 		if ch == eof {
-			return "", false, &SyntaxError{Message: "Expected close tag, found EOF", Pos: s.pos}
-		} else if ch == '-' && s.peekN(2) == "%>" {
-			s.readN(2)
-			trimRight = true
-			break
-		} else if ch == '%' && s.peek() == '>' {
-			s.read()
-			break
+			return "", &SyntaxError{Message: "Expected close tag, found EOF", Pos: s.pos}
+		} else if ch == '%' {
+			ch := s.read()
+			if ch == eof {
+				return "", &SyntaxError{Message: "Expected close tag, found EOF", Pos: s.pos}
+			} else if ch == '>' {
+				break
+			} else {
+				buf.WriteRune('%')
+				buf.WriteRune(ch)
+			}
 		} else {
 			buf.WriteRune(ch)
 		}
 	}
-	return buf.String(), trimRight, nil
+	return string(buf.Bytes()), nil
 }
 
 func (s *Scanner) scanField() (*Field, error) {
@@ -615,6 +596,7 @@ func (s *Scanner) skipWhitespace() {
 	for ch := s.peek(); isWhitespace(ch); ch = s.peek() {
 		s.read()
 	}
+	return
 }
 
 const eof = rune(0)

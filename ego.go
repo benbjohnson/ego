@@ -10,7 +10,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-	"unicode"
 )
 
 // Template represents an entire Ego template.
@@ -114,8 +113,7 @@ func writeBlocksTo(buf *bytes.Buffer, blks []Block) {
 // Normalize joins together adjacent text blocks.
 func normalizeBlocks(a []Block) []Block {
 	a = joinAdjacentTextBlocks(a)
-	a = trimLeftRight(a)
-	a = trimEmptyTextBlocks(a)
+	a = trimTrailingEmptyTextBlocks(a)
 	return a
 }
 
@@ -144,31 +142,16 @@ func joinAdjacentTextBlocks(a []Block) []Block {
 	return other
 }
 
-func trimLeftRight(a []Block) []Block {
-	for i, blk := range a {
-		trimLeft, trimRight := blk.trim()
-		if trimLeft && i > 1 {
-			if textBlock, ok := a[i-1].(*TextBlock); ok {
-				textBlock.Content = strings.TrimRightFunc(textBlock.Content, unicode.IsSpace)
-			}
+func trimTrailingEmptyTextBlocks(a []Block) []Block {
+	for len(a) > 0 {
+		blk, ok := a[len(a)-1].(*TextBlock)
+		if !ok || strings.TrimSpace(blk.Content) != "" {
+			break
 		}
-		if trimRight && i+1 < len(a) {
-			if textBlock, ok := a[i+1].(*TextBlock); ok {
-				textBlock.Content = strings.TrimLeftFunc(textBlock.Content, unicode.IsSpace)
-			}
-		}
+		a[len(a)-1] = nil
+		a = a[:len(a)-1]
 	}
 	return a
-}
-
-func trimEmptyTextBlocks(a []Block) []Block {
-	b := make([]Block, 0, len(a))
-	for _, blk := range a {
-		if tb, ok := blk.(*TextBlock); !ok || strings.TrimSpace(tb.Content) != "" {
-			b = append(b, blk)
-		}
-	}
-	return b
 }
 
 func injectImports(f *ast.File) {
@@ -249,7 +232,6 @@ func removeImportSpecs(decl *ast.GenDecl, names []string) {
 // Block represents an element of the template.
 type Block interface {
 	block()
-	trim() (bool, bool)
 }
 
 func (*TextBlock) block()           {}
@@ -261,15 +243,6 @@ func (*ComponentEndBlock) block()   {}
 func (*AttrStartBlock) block()      {}
 func (*AttrEndBlock) block()        {}
 
-func (*TextBlock) trim() (bool, bool)           { return false, false }
-func (b *CodeBlock) trim() (bool, bool)         { return b.TrimLeft, b.TrimRight }
-func (b *PrintBlock) trim() (bool, bool)        { return b.TrimLeft, b.TrimRight }
-func (b *RawPrintBlock) trim() (bool, bool)     { return b.TrimLeft, b.TrimRight }
-func (*ComponentStartBlock) trim() (bool, bool) { return false, false }
-func (*ComponentEndBlock) trim() (bool, bool)   { return false, false }
-func (*AttrStartBlock) trim() (bool, bool)      { return false, false }
-func (*AttrEndBlock) trim() (bool, bool)        { return false, false }
-
 // TextBlock represents a UTF-8 encoded block of text that is written to the writer as-is.
 type TextBlock struct {
 	Pos     Pos
@@ -278,26 +251,20 @@ type TextBlock struct {
 
 // CodeBlock represents a Go code block that is printed as-is to the template.
 type CodeBlock struct {
-	Pos       Pos
-	Content   string
-	TrimLeft  bool
-	TrimRight bool
+	Pos     Pos
+	Content string
 }
 
 // PrintBlock represents a block that will HTML escape the contents before outputting
 type PrintBlock struct {
-	Pos       Pos
-	Content   string
-	TrimLeft  bool
-	TrimRight bool
+	Pos     Pos
+	Content string
 }
 
 // RawPrintBlock represents a block of the template that is printed out to the writer.
 type RawPrintBlock struct {
-	Pos       Pos
-	Content   string
-	TrimLeft  bool
-	TrimRight bool
+	Pos     Pos
+	Content string
 }
 
 // ComponentStartBlock represents the opening block of an ego component.
@@ -436,6 +403,11 @@ func stringSliceContains(a []string, v string) bool {
 		}
 	}
 	return false
+}
+
+type stackElem struct {
+	block Block
+	yield []Block
 }
 
 // AttrNames returns a sorted list of names for an attribute set.
