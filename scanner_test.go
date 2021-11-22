@@ -462,6 +462,26 @@ func TestScanner(t *testing.T) {
 				})
 			})
 		})
+
+		t.Run("XMLNS", func(t *testing.T) {
+			s := ego.NewScanner(bytes.NewBufferString(`<v:rect xmlns:v="urn:schemas-microsoft-com:vml">`), "tmpl.ego")
+			if blk, err := s.Scan(); err != nil {
+				t.Fatal(err)
+			} else if blk, ok := blk.(*ego.ComponentStartBlock); !ok {
+				t.Fatalf("unexpected block type: %T", blk)
+			} else if len(blk.Attrs) != 1 {
+				t.Fatalf("unexpected attr count: %d", len(blk.Attrs))
+			} else if !reflect.DeepEqual(blk.Attrs[0], &ego.Attr{
+				Name:     "xmlns:v",
+				NamePos:  ego.Pos{Path: "tmpl.ego", LineNo: 1},
+				Value:    `"urn:schemas-microsoft-com:vml"`,
+				ValuePos: ego.Pos{Path: "tmpl.ego", LineNo: 1}},
+			) {
+				t.Fatalf("unexpected attr: %#v", blk.Attrs[0])
+			} else if !reflect.DeepEqual(blk.XMLNS, []string{"v"}) {
+				t.Fatalf("unexpected XMLNS: %v", blk.XMLNS)
+			}
+		})
 	})
 
 	t.Run("ComponentEndBlock", func(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"io"
 	"io/ioutil"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -20,6 +21,8 @@ type Scanner struct {
 	i int
 
 	pos Pos
+
+	textOnly bool
 }
 
 // NewScanner initializes a new scanner with a given reader.
@@ -41,15 +44,17 @@ func (s *Scanner) Scan() (Block, error) {
 
 	switch s.peek() {
 	case '<':
-		// Special handling for component/attr blocks.
-		if s.peekComponentStartBlock() {
-			return s.scanComponentStartBlock()
-		} else if s.peekComponentEndBlock() {
-			return s.scanComponentEndBlock()
-		} else if s.peekAttrStartBlock() {
-			return s.scanAttrStartBlock()
-		} else if s.peekAttrEndBlock() {
-			return s.scanAttrEndBlock()
+		if !s.textOnly {
+			// Special handling for component/attr blocks.
+			if s.peekComponentStartBlock() {
+				return s.scanComponentStartBlock()
+			} else if s.peekComponentEndBlock() {
+				return s.scanComponentEndBlock()
+			} else if s.peekAttrStartBlock() {
+				return s.scanAttrStartBlock()
+			} else if s.peekAttrEndBlock() {
+				return s.scanAttrEndBlock()
+			}
 		}
 
 		// Special handling for ego blocks.
@@ -65,6 +70,20 @@ func (s *Scanner) Scan() (Block, error) {
 		return nil, io.EOF
 	}
 	return s.scanTextBlock()
+}
+
+func (s *Scanner) componentStartBlockScanner(b *ComponentStartBlock) *Scanner {
+	return &Scanner{
+		r:        s.r,
+		b:        s.b[:b.EndI],
+		i:        b.StartI,
+		pos:      b.Pos,
+		textOnly: true,
+	}
+}
+
+func (s *Scanner) componentEndBlockToTextBlock(b *ComponentEndBlock) *TextBlock {
+	return &TextBlock{Pos: s.pos, Content: string(s.b[b.StartI:b.EndI])}
 }
 
 func (s *Scanner) scanTextBlock() (*TextBlock, error) {
@@ -137,8 +156,9 @@ func (s *Scanner) peekComponentStartBlock() bool {
 }
 
 func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) {
-	b := &ComponentStartBlock{Pos: s.pos}
+	b := &ComponentStartBlock{Pos: s.pos, StartI: s.i}
 	assert(s.read() == '<')
+	defer func() { b.EndI = s.i }()
 
 	// Scan package name. The ego package is reserved for local types.
 	if b.Package, err = s.scanIdent(); err != nil {
@@ -180,6 +200,9 @@ func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) 
 		if err != nil {
 			return nil, err
 		}
+		if strings.HasPrefix(attr.Name, "xmlns:") {
+			b.XMLNS = append(b.XMLNS, attr.Name[6:])
+		}
 		b.Attrs = append(b.Attrs, attr)
 	}
 
@@ -205,8 +228,9 @@ func (s *Scanner) peekComponentEndBlock() bool {
 }
 
 func (s *Scanner) scanComponentEndBlock() (_ *ComponentEndBlock, err error) {
-	b := &ComponentEndBlock{Pos: s.pos}
+	b := &ComponentEndBlock{Pos: s.pos, StartI: s.i}
 	assert(s.readN(2) == "</")
+	defer func() { b.EndI = s.i }()
 
 	// Scan package name.
 	if b.Package, err = s.scanIdent(); err != nil {
