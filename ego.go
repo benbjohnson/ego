@@ -270,12 +270,15 @@ type RawPrintBlock struct {
 // ComponentStartBlock represents the opening block of an ego component.
 type ComponentStartBlock struct {
 	Pos        Pos
+	StartI     int
+	EndI       int
 	Package    string
 	Name       string
 	Closed     bool
 	Fields     []*Field
 	Attrs      []*Attr
 	AttrBlocks []*AttrStartBlock
+	XMLNS      []string
 	Yield      []Block
 }
 
@@ -290,6 +293,8 @@ func (blk *ComponentStartBlock) Namespace() string {
 // ComponentEndBlock represents the closing block of an ego component.
 type ComponentEndBlock struct {
 	Pos     Pos
+	StartI  int
+	EndI    int
 	Package string
 	Name    string
 }
