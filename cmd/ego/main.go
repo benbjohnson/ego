@@ -62,11 +62,6 @@ func run(args []string) error {
 			continue
 		}
 
-		// Ignore files without an .ego extension.
-		if filepath.Ext(path) != ".ego" {
-			continue
-		}
-
 		// Process individual file.
 		if err := processFile(path); err != nil {
 			return err
@@ -82,7 +77,14 @@ func processDir(path string) error {
 		return err
 	}
 	for _, fi := range fis {
-		if err := processFile(filepath.Join(path, fi.Name())); err != nil {
+		filePath := filepath.Join(path, fi.Name())
+		if fi.IsDir() {
+			if err := processDir(filePath); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := processFile(filePath); err != nil {
 			return err
 		}
 	}
