@@ -151,7 +151,7 @@ func (s *Scanner) scanComponentStartBlock() (_ *ComponentStartBlock, err error) 
 	assert(s.read() == ':')
 
 	// Scan type name.
-	if b.Name, err = s.scanIdent(); err != nil {
+	if b.Name, err = s.scanDottedIdent(); err != nil {
 		return nil, err
 	}
 
@@ -219,7 +219,7 @@ func (s *Scanner) scanComponentEndBlock() (_ *ComponentEndBlock, err error) {
 	assert(s.read() == ':')
 
 	// Scan name.
-	if b.Name, err = s.scanIdent(); err != nil {
+	if b.Name, err = s.scanDottedIdent(); err != nil {
 		return nil, err
 	}
 	s.skipWhitespace()
@@ -446,6 +446,33 @@ func (s *Scanner) scanIdent() (string, error) {
 		buf.WriteRune(s.read())
 	}
 
+	return buf.String(), nil
+}
+
+func (s *Scanner) scanDottedIdent() (string, error) {
+	var (
+		buf bytes.Buffer
+		lastCh rune
+	)
+
+	// First rune must be a letter.
+	ch := s.read()
+	if !isIdentStart(ch) {
+		return "", NewSyntaxError(s.pos, "Expected identifier, found %s", runeString(ch))
+	}
+	buf.WriteRune(ch)
+
+	// Keep scanning while we have letters, dot or digits.
+	for ch := s.peek(); unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '.'; ch = s.peek() {
+		if ch == '.' && lastCh == '.' {
+			return "", NewSyntaxError(s.pos, "Expected identifier (with sigle dot separator), found double dot separator near %s", buf.String())
+		}
+		buf.WriteRune(s.read())
+		lastCh = ch
+	}
+	if lastCh == '.' {
+		return "", NewSyntaxError(s.pos, "Expected identifier (ended with letter), found %s", buf.String())
+	}
 	return buf.String(), nil
 }
 
